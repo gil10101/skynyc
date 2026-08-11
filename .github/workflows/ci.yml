@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      # The unit tests cover the detector engine and API parsers, which need only
+      # pydantic and pytest. The heavier pins in requirements.txt (confluent-kafka,
+      # psycopg) pull in system libraries and are exercised by the deployed stack,
+      # not by these tests — installing them here would slow CI for no coverage
+      # gain. Versions match requirements.txt / requirements-dev.txt.
+      - name: Install test dependencies
+        run: pip install pydantic==2.9.2 pytest==8.3.3
+      - name: Run tests
+        run: python3 -m pytest tests/ -q
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      # Pinned because the ignore list in pyproject.toml was validated against this
+      # ruff version; an unpinned linter can start failing on newly added rules.
+      - name: Install ruff
+        run: pip install ruff==0.16.2
+      - name: Lint
+        run: ruff check .

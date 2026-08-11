@@ -1,0 +1,20 @@
+# Lint configuration only — packaging stays requirements-file based because the
+# services are built from per-image pin sets (see Dockerfiles), not an installable
+# distribution of this repo.
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+
+[tool.ruff.lint.per-file-ignores]
+# Findings that predate the lint gate, grandfathered per file so `ruff check .`
+# lands green without churning reviewed pipeline code. New files (and new
+# findings in other files) still get the full rule set.
+"orchestration/dagster_project/skynyc_dagster/definitions.py" = ["I001"]  # import-block order
+"scripts/smoke.py" = ["E741"]  # single-letter variable
+"streaming/spark_app.py" = ["I001"]  # import-block order
+"tests/synthetic_tracks.py" = ["E501"]  # long line in track geometry
+"tests/test_parsers.py" = ["E741"]  # single-letter comprehension variable
