@@ -1,0 +1,35 @@
+# SkyNYC Spark runtime — one PySpark 4.0.x app on local[*] (PRD §7, Manual 04).
+#
+# Version lockstep (Manual 04): the pyspark pip pin, the spark-sql-kafka
+# connector, and Spark's Scala (2.13) must all match the same Spark release.
+# Bump them together or not at all. hadoop-azure tracks Spark 4.0's bundled
+# Hadoop line (3.4.x) for the abfss:// bronze writes.
+# -bookworm pin: current -slim tracks Debian trixie, which dropped openjdk-17;
+# Spark 4.0 wants Java 17/21 and bookworm still ships 17 deterministically.
+FROM python:3.11-slim-bookworm
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends openjdk-17-jre-headless procps \
+ && rm -rf /var/lib/apt/lists/*
+# JAVA_HOME differs by arch (amd64 droplet vs arm64 laptop); resolve the real
+# path once at build time instead of baking an arch-specific string.
+RUN ln -sfn "$(dirname "$(dirname "$(readlink -f "$(which java)")")")" /opt/java
+ENV JAVA_HOME=/opt/java
+
+WORKDIR /app
+# spark-submit puts the script's own directory on sys.path, not the workdir —
+# without this the `streaming` package import fails inside the app.
+ENV PYTHONPATH=/app
+
+RUN pip install --no-cache-dir pyspark==4.0.1 "psycopg[binary]==3.2.3"
+
+COPY streaming/ streaming/
+
+# --packages resolves on first start into the ivy cache volume (compose mounts
+# it), so restarts don't re-download jars.
+CMD ["spark-submit", \
+     "--master", "local[*]", \
+     "--driver-memory", "4g", \
+     "--packages", "org.apache.spark:spark-sql-kafka-0-10_2.13:4.0.1,org.apache.hadoop:hadoop-azure:3.4.0", \
+     "--conf", "spark.jars.ivy=/opt/ivy", \
+     "streaming/spark_app.py"]
