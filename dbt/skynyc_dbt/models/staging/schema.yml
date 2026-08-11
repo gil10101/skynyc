@@ -3,9 +3,15 @@ version: 2
 models:
   - name: stg_flight_events
     description: One row per detected event (grain = event_id).
+    tests:
+      # '' passes not_null — guards the empty-string-icao24 producer incident class.
+      - dbt_utils.expression_is_true:
+          expression: "icao24 <> ''"
     columns:
       - name: event_id
         tests: [unique, not_null]
+      - name: icao24
+        tests: [not_null]
       - name: event_type
         tests:
           - accepted_values:

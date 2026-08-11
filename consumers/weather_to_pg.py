@@ -107,6 +107,14 @@ def main() -> None:
                         message.topic(), message.partition(), message.offset())
             consumer.commit(message)
             continue
+        if not isinstance(payload, dict):
+            # Valid JSON need not be an object: dict(payload) in upsert() would
+            # raise outside both retry arms — a crash-loop replaying this same
+            # offset forever, not a counted drop.
+            log.warning("non-object message on %s@%d:%d — skipping (counted drop)",
+                        message.topic(), message.partition(), message.offset())
+            consumer.commit(message)
+            continue
         # Upsert-then-commit; on connection failure, reconnect and retry the same
         # message. A non-connection error (bad row) is a counted drop, not a
         # poison pill that crash-loops the consumer on the same offset forever.

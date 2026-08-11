@@ -15,3 +15,10 @@ sources:
           error_after: { count: 3, period: hour }
       - name: arrivals_ground_truth
         description: OpenSky nightly-batch arrivals (D-1 freshest, PRD §5.1).
+        loaded_at_field: last_seen
+        freshness:
+          # Upstream is a nightly batch serving D-1, so anything older than two
+          # days means the daily pull stopped — the daemon or its schedule is
+          # off (Manual 07).
+          warn_after: { count: 2, period: day }
+          error_after: { count: 4, period: day }
