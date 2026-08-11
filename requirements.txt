@@ -1,0 +1,7 @@
+# Ingestion runtime (producers + weather consumer). Spark's pinned deps arrive
+# with M2 in their own file — pyspark and its connector version must move together
+# (Manual 04) and are deliberately not mixed in here.
+confluent-kafka==2.6.1
+pydantic==2.9.2
+requests==2.32.3
+psycopg[binary]==3.2.3
