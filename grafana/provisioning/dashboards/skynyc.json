@@ -20,12 +20,35 @@
           "refId": "A",
           "format": "table",
           "rawSql": "SELECT icao24, callsign, latitude, longitude, baro_alt_m, velocity_ms, track_deg, updated_at FROM live_states WHERE updated_at > now() - interval '90 seconds' AND NOT on_ground AND latitude IS NOT NULL AND longitude IS NOT NULL"
+        },
+        {
+          "refId": "B",
+          "format": "table",
+          "rawSql": "SELECT 'JFK' AS airport, 40.6413 AS a_lat, -73.7781 AS a_lon UNION ALL SELECT 'LGA', 40.7769, -73.8740 UNION ALL SELECT 'EWR', 40.6895, -74.1745"
         }
       ],
       "options": {
         "view": { "id": "coords", "lat": 40.7, "lon": -73.95, "zoom": 8.5 },
         "basemap": { "type": "default", "name": "Basemap" },
         "layers": [
+          {
+            "type": "markers",
+            "name": "Airports",
+            "filterData": { "id": "byRefId", "options": "B" },
+            "location": { "mode": "coords", "latitude": "a_lat", "longitude": "a_lon" },
+            "config": {
+              "style": {
+                "size": { "fixed": 10 },
+                "color": { "fixed": "orange" },
+                "fillOpacity": 1,
+                "symbol": { "mode": "fixed", "fixed": "img/icons/marker/x-mark.svg" },
+                "text": { "mode": "field", "field": "airport" },
+                "textConfig": { "fontSize": 13, "offsetY": -14, "textAlign": "center", "textBaseline": "middle" }
+              },
+              "showLegend": false
+            },
+            "tooltip": false
+          },
           {
             "type": "markers",
             "name": "Aircraft",
