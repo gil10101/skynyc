@@ -99,9 +99,12 @@ def read_states(spark: SparkSession, replay_from_ms: str | None = None) -> DataF
         .option("maxOffsetsPerTrigger", 50000)  # bound replay batch size after downtime
     )
     if replay_from_ms:
+        # Topic partitions can only grow; an env override beats a silent
+        # mismatch that would replay a subset of partitions.
+        partitions = int(os.environ.get("KAFKA_STATES_PARTITIONS", "3"))
         reader = reader.option(
             "startingOffsetsByTimestamp",
-            json.dumps({TOPIC: {str(p): int(replay_from_ms) for p in range(3)}}),
+            json.dumps({TOPIC: {str(p): int(replay_from_ms) for p in range(partitions)}}),
         )
     else:
         reader = reader.option("startingOffsets", "earliest")
@@ -119,7 +122,10 @@ def start_bronze(spark: SparkSession) -> None:
     deduped = (
         states.filter(F.col("lat").isNotNull() & F.col("lon").isNotNull())  # drops counted upstream
         .withWatermark("api_time", "2 minutes")
-        .dropDuplicates(["icao24", "api_ts"])
+        # Dedup state evicts only when the watermark column participates —
+        # dropDuplicatesWithinWatermark exists for exactly this (plain
+        # dropDuplicates on a non-watermark subset grows state forever).
+        .dropDuplicatesWithinWatermark(["icao24", "api_ts"])
         .withColumn("dt", F.date_format("api_time", "yyyy-MM-dd"))
         .withColumn("hr", F.date_format("api_time", "HH"))
     )
@@ -192,6 +198,8 @@ def detect_events(key: tuple, batches: Iterator, state: GroupState) -> Iterator:
     """applyInPandasWithState bridge: pandas in/out, pure engine in the middle."""
     import pandas as pd  # worker-side import
 
+    # The grouping key is the authoritative identity on both paths — the state
+    # blob alone must never be trusted for it (pre-icao24 blobs carry none).
     icao24 = key[0]
     # GroupState.getOption is a PROPERTY yielding the state tuple or None —
     # calling it like a method crashes on the first batch that carries state.
@@ -199,7 +207,7 @@ def detect_events(key: tuple, batches: Iterator, state: GroupState) -> Iterator:
     current = engine.decode_state(stored[0] if stored else None)
 
     if state.hasTimedOut:
-        _, events = engine.process(current, [], timed_out=True)
+        _, events = engine.process(current, [], icao24=icao24, timed_out=True)
         state.remove()
     else:
         messages: list[dict[str, Any]] = []
@@ -208,7 +216,7 @@ def detect_events(key: tuple, batches: Iterator, state: GroupState) -> Iterator:
                 record["icao24"] = icao24
                 messages.append(record)
         messages.sort(key=lambda m: m["api_ts"])
-        current, events = engine.process(current, messages)
+        current, events = engine.process(current, messages, icao24=icao24)
         if current is None:
             state.remove()
         else:

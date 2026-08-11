@@ -4,8 +4,10 @@ Real sequences captured 2026-08-11 from the droplet's retained log
 (scripts/capture_sequence.py); synthetic geometry only where weather has not
 yet provided the pattern (tests/synthetic_tracks.py — disclosed there).
 
-Tests drive the pure engine sample-by-sample — the worst-case micro-batch
-granularity — so passing here holds under any Spark batching.
+Tests drive the pure engine sample-by-sample, again as one coarse replay-sized
+batch, and again through the encode/decode state seam the Spark bridge crosses
+between micro-batches — emission must be identical on all three paths, so
+passing here holds under any Spark batching and across serialized state.
 """
 
 import json
@@ -31,6 +33,24 @@ def run_engine(messages: list[dict], *, final_timeout: bool = False) -> list[dic
         events.extend(new_events)
     if final_timeout:
         state, new_events = engine.process(state, [], timed_out=True)
+        events.extend(new_events)
+    return events
+
+
+def run_engine_through_seam(messages: list[dict], *, icao24: str,
+                            final_timeout: bool = False) -> list[dict]:
+    """run_engine, but with the Spark bridge's exact state lifecycle: the state
+    JSON-round-trips through encode_state/decode_state between every message
+    (one message per micro-batch), and the grouping key is passed explicitly on
+    both the data and timeout paths."""
+    state = None
+    events: list[dict] = []
+    for message in messages:
+        state, new_events = engine.process(state, [message], icao24=icao24)
+        state = engine.decode_state(engine.encode_state(state))
+        events.extend(new_events)
+    if final_timeout:
+        state, new_events = engine.process(state, [], icao24=icao24, timed_out=True)
         events.extend(new_events)
     return events
 
@@ -121,6 +141,80 @@ class TestGoAround:
         for name in ("arrival_jfk_baw04a", "arrival_ewr_dlh402"):
             events = run_engine(load_messages(name))
             assert only_types(events, "go_around") == [], name
+
+
+class TestSerializationSeam:
+    # final_timeout mirrors the original test for each sequence: arrivals
+    # confirm on ground contact; the rest need the 90 s silence to conclude.
+    CASES = {
+        "arrival_jfk_baw04a": False,
+        "arrival_ewr_dlh402": False,
+        "coverage_loss_lga_dal2602": True,
+        "overflight_amx034": True,
+        "taxi_jfk_afr006": True,
+    }
+
+    def test_seam_run_matches_in_memory_run(self):
+        for name, final_timeout in self.CASES.items():
+            messages = load_messages(name)
+            icao24 = messages[0]["icao24"]
+            in_memory = run_engine(messages, final_timeout=final_timeout)
+            seam = run_engine_through_seam(messages, icao24=icao24,
+                                           final_timeout=final_timeout)
+            assert seam == in_memory, name
+            assert [e["event_id"] for e in seam] == \
+                [e["event_id"] for e in in_memory], name
+            for event in seam:
+                # Identity must survive the blob — a timeout-confirmed event
+                # with empty icao24 corrupts event_id and ground-truth matching.
+                assert event["icao24"] == icao24, name
+                assert event["icao24"], name
+
+
+class TestBatchGranularity:
+    def test_coarse_batch_equivalence(self):
+        # Replay/catch-up delivers whole tracks in one micro-batch; emission
+        # must match the live 1-sample-per-batch cadence exactly.
+        for name, track, event_type in (
+            ("arrival_jfk_baw04a", load_messages("arrival_jfk_baw04a"), "arrival"),
+            ("go_around", synthetic_tracks.go_around(), "go_around"),
+        ):
+            fine = run_engine(track)
+            _, coarse = engine.process(None, list(track))
+            assert coarse == fine, name
+            [expected] = only_types(fine, event_type)
+            [got] = only_types(coarse, event_type)
+            assert (got["airport"], got["event_ts"], got["event_id"]) == (
+                expected["airport"], expected["event_ts"], expected["event_id"]), name
+
+    def test_event_time_gap_resets_state(self):
+        # Coverage-loss approach, then the same aircraft seen again hours later
+        # taxiing. DOCUMENTED MUTATION of recorded data: the taxi track's ts
+        # values are shifted to open a 4 h event-time gap, and it borrows the
+        # approach's icao24 because gap-reset is per-aircraft state. No external
+        # timeout fires — on replay it never would; crossing the gap must
+        # confirm the arrival exactly as live coverage loss does.
+        approach = load_messages("coverage_loss_lga_dal2602")
+        icao24 = approach[0]["icao24"]
+        shift = (approach[-1]["api_ts"] + 4 * 3600) - load_messages("taxi_jfk_afr006")[0]["api_ts"]
+        later_taxi = [
+            {**m, "icao24": icao24,
+             "api_ts": m["api_ts"] + shift, "poll_ts": m["poll_ts"] + shift}
+            for m in load_messages("taxi_jfk_afr006")
+        ]
+        state = None
+        events: list[dict] = []
+        for message in approach + later_taxi:
+            state, new = engine.process(state, [message])
+            events.extend(new)
+        arrivals = only_types(events, "arrival")
+        assert len(arrivals) == 1, events
+        assert arrivals[0]["airport"] == "KLGA"
+        assert arrivals[0]["icao24"] == icao24
+        assert arrivals[0]["details"]["confirmation"] == "coverage_loss"
+        # Confirmed at the gap crossing, from the pre-gap short-final sample.
+        assert arrivals[0]["event_ts"] == approach[-1]["api_ts"]
+        assert events == arrivals  # the taxi portion contributes nothing
 
 
 class TestStateHygiene:
