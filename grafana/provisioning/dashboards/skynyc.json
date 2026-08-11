@@ -55,9 +55,9 @@
             "location": { "mode": "coords", "latitude": "latitude", "longitude": "longitude" },
             "config": {
               "style": {
-                "size": { "fixed": 6 },
+                "size": { "fixed": 9 },
                 "color": { "field": "baro_alt_m" },
-                "fillOpacity": 0.9,
+                "fillOpacity": 1,
                 "symbol": { "mode": "fixed", "fixed": "img/icons/marker/plane.svg" },
                 "symbolAlign": { "horizontal": "center", "vertical": "center" },
                 "rotation": { "mode": "field", "field": "track_deg", "fixed": 0, "min": -360, "max": 360 }

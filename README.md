@@ -1,5 +1,7 @@
 # SkyNYC
 
+[![CI](https://github.com/gil10101/skynyc/actions/workflows/ci.yml/badge.svg)](https://github.com/gil10101/skynyc/actions/workflows/ci.yml)
+
 Real-time measurement of how weather degrades airport operations in the New York
 terminal area — JFK, LaGuardia, and Newark.
 
@@ -18,6 +20,18 @@ variable (visibility, ceiling, wind/gusts) is the strongest leading indicator?
 *derived* from position telemetry by per-aircraft state machines, then *validated*
 daily against ground truth. The derive-and-validate loop — not the moving map —
 is the point.
+
+---
+
+## The system, live
+
+![Live dashboard: aircraft over the NYC terminal area colored by altitude, current conditions per station, end-to-end pipeline freshness](docs/img/grafana-dashboard.png)
+*The provisioned dashboard: heading-rotated aircraft colored by altitude around the three fields, per-station conditions with flight category, and the end-to-end freshness stat that doubles as the pipeline's liveness alarm.*
+
+| | |
+|---|---|
+| ![Spark Structured Streaming UI: the three checkpointed queries](docs/img/spark-streaming-queries.png) *Three checkpointed streaming queries: bronze, live, events* | ![Dagster asset catalog: ground truth pull and nightly backup](docs/img/dagster-assets.png) *Batch layer: daily ground-truth pull, nightly lake backup* |
+| ![Derived flight events queried live from Postgres](docs/img/events-live.png) *The product no feed provides: derived arrivals and holding patterns* | ![Azure ADLS Gen2 bronze archive listing](docs/img/azure-lake.png) *The lake: partitioned Parquet archive plus database backups* |
 
 ---
 
