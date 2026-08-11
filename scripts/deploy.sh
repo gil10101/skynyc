@@ -4,8 +4,8 @@
 # Works against a root login (classic VPS providers) or a sudo-capable user —
 # AWS Ubuntu AMIs log in as `ubuntu`. First run on a fresh box: installs Docker
 # via get.docker.com, adds a 4 GB swap file, syncs the tree, brings up infra,
-# creates topics, starts ingestion. Re-runs just sync + restart what changed.
-# The laptop keeps nothing running.
+# creates topics, starts ingestion, applies migrations, starts Spark + Dagster.
+# Re-runs just sync + restart what changed. The laptop keeps nothing running.
 #
 # Prereqs in .env: VPS_HOST (e.g. ubuntu@<ec2-ip> or root@<ip>), VPS_SSH_KEY.
 set -euo pipefail
@@ -45,9 +45,20 @@ echo "==> up + topics + ingest"
 "${SSH[@]}" "cd $DEST && $RSUDO docker compose up -d kafka postgres grafana \
   && sleep 20 && $RSUDO make topics && $RSUDO make ingest"
 
+# 001 runs via initdb.d only on an empty volume (Manual 05); the later numbered
+# files are written idempotent, so re-applying them on every deploy is safe.
+echo "==> migrations"
+"${SSH[@]}" "cd $DEST && for f in db/init/0*.sql; do \
+  [ \"\$f\" = db/init/001_schema.sql ] && continue; \
+  $RSUDO docker compose exec -T postgres psql -U skynyc -d skynyc < \"\$f\" || exit 1; done"
+
+echo "==> stream + batch"
+"${SSH[@]}" "cd $DEST && $RSUDO make stream && $RSUDO make batch"
+
 echo "==> verify"
 "${SSH[@]}" "cd $DEST && $RSUDO docker compose ps --format 'table {{.Service}}\t{{.Status}}' \
-  && sleep 35 && $RSUDO docker compose logs --no-log-prefix --tail 2 producer-opensky"
+  && sleep 35 && $RSUDO docker compose logs --no-log-prefix --tail 2 producer-opensky \
+  && $RSUDO docker compose ps --format 'table {{.Service}}\t{{.Status}}' spark dagster-daemon"
 
 echo
 echo "deployed. Grafana stays private — reach it with a tunnel, never an open port:"

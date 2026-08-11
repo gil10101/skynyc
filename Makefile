@@ -9,7 +9,7 @@ PG_USER ?= skynyc
 PG_DB ?= skynyc
 
 .DEFAULT_GOAL := help
-.PHONY: help up down logs ps topics smoke psql ingest lag credits test stream
+.PHONY: help up down logs ps topics smoke psql ingest lag credits test stream batch dbt-build backup backup
 
 help:
 	@echo "SkyNYC targets:"
@@ -24,7 +24,10 @@ help:
 	@echo "  lag     weather consumer group lag (Spark never appears here — Manual 04)"
 	@echo "  credits last logged OpenSky credit balance + daily projection"
 	@echo "  test    run the pytest suite (parsers now; detectors from M3)"
-	@echo "  stream  build + start the Spark streaming app (bronze + live queries)"
+	@echo "  stream  build + start the Spark streaming app (bronze + live + events)"
+	@echo "  batch   build + start dagster webserver + daemon (UI on :3001)"
+	@echo "  dbt-build  dbt deps + build (staging, marts, tests) inside the dagster image"
+	@echo "  backup  run the postgres_backup asset once (pg_dump -Fc -> Azure backups)"
 
 up:
 	$(COMPOSE) up -d
@@ -91,3 +94,9 @@ batch:
 dbt-build:
 	$(COMPOSE) exec -T dagster-webserver sh -c \
 	  "cd /app/dbt/skynyc_dbt && dbt deps --profiles-dir . -q && dbt build --profiles-dir ."
+
+# One-off manual backup; the nightly_backup schedule covers 03:30 ET once it is
+# toggled on in the UI (Manual 07).
+backup:
+	$(COMPOSE) exec -T dagster-webserver dagster asset materialize \
+	  -m skynyc_dagster.definitions --select postgres_backup

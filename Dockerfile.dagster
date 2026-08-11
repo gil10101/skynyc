@@ -7,12 +7,22 @@ WORKDIR /app
 ENV PYTHONPATH=/app
 ENV DAGSTER_HOME=/opt/dagster/dagster_home
 
+# pg_dump for the nightly backup asset. Must be the v16 client: pg_dump refuses
+# to dump a server newer than itself, and bookworm's default postgresql-client
+# is 15 against our postgres 16 — so take 16 from PGDG (official helper script).
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends postgresql-common \
+ && /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y \
+ && apt-get install -y --no-install-recommends postgresql-client-16 \
+ && rm -rf /var/lib/apt/lists/*
+
 # dbt-core pinned EXPLICITLY: unpinned resolution pulls the dbt Fusion 2.0 beta,
 # whose engine does not support the postgres adapter.
 RUN pip install --no-cache-dir \
     dagster==1.8.13 dagster-webserver==1.8.13 dagster-postgres==0.24.13 \
     dbt-core==1.8.7 dbt-postgres==1.8.2 \
-    requests==2.32.3 "psycopg[binary]==3.2.3" pydantic==2.9.2
+    requests==2.32.3 "psycopg[binary]==3.2.3" pydantic==2.9.2 \
+    azure-storage-blob==12.23.1
 
 COPY producers/ producers/
 COPY orchestration/ orchestration/

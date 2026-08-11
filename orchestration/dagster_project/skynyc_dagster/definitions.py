@@ -1,9 +1,9 @@
 """Dagster definitions — batch orchestration only (PRD §9, Manual 07).
 
-Dagster schedules the finite jobs: the daily ground-truth pull now, the hourly
-dbt build in M4. It does NOT supervise producers or Spark — Docker restart
-policies do; an orchestrator's run model is the wrong shape for an infinite
-process.
+Dagster schedules the finite jobs: the daily ground-truth pull and the nightly
+Postgres backup now, the hourly dbt build in M4. It does NOT supervise
+producers or Spark — Docker restart policies do; an orchestrator's run model is
+the wrong shape for an infinite process.
 
 Schedules ship OFF (Dagster default): toggle them on once in the UI under
 Automation — until then nothing fires and nothing errors (Manual 07 trap #2).
@@ -12,13 +12,17 @@ Automation — until then nothing fires and nothing errors (Manual 07 trap #2).
 from __future__ import annotations
 
 import os
+import subprocess
+import tempfile
 from datetime import datetime, timedelta, timezone
 
 import psycopg
 import requests
+from azure.storage.blob import BlobServiceClient
 from dagster import (
     DailyPartitionsDefinition,
     Definitions,
+    ScheduleDefinition,
     asset,
     define_asset_job,
     build_schedule_from_partitioned_job,
@@ -109,5 +113,64 @@ daily_ground_truth = build_schedule_from_partitioned_job(
     ground_truth_job, name="daily_ground_truth", hour_of_day=9, minute_of_hour=15,
 )
 
-defs = Definitions(assets=[ground_truth_arrivals], jobs=[ground_truth_job],
-                   schedules=[daily_ground_truth])
+BACKUP_CONTAINER = "backups"
+
+
+@asset(group_name="ops")
+def postgres_backup(context) -> None:  # noqa: ANN001 — unannotated per dagster's context rules
+    """pg_dump -Fc of the whole database -> Azure blob backups/skynyc_<UTC day>.dump.
+
+    Custom format so a restore can pick tables (pg_restore -t). One blob per
+    UTC day, uploaded with overwrite=True: re-running a night replaces that
+    day's dump instead of duplicating or erroring. Without Azure creds in the
+    environment there is nothing to upload to — warn and skip, so local dev
+    never fails on missing cloud config.
+    """
+    account = os.environ.get("AZURE_STORAGE_ACCOUNT")
+    key = os.environ.get("AZURE_STORAGE_KEY")
+    if not account or not key:
+        context.log.warning(
+            "AZURE_STORAGE_ACCOUNT/AZURE_STORAGE_KEY not set — skipping backup upload"
+        )
+        return
+
+    blob_name = f"skynyc_{datetime.now(timezone.utc):%Y-%m-%d}.dump"
+    fd, dump_path = tempfile.mkstemp(prefix="skynyc_", suffix=".dump")
+    os.close(fd)
+    try:
+        # No check=True: CalledProcessError reprs the argv, and the argv carries
+        # the DSN — password included. Surface stderr only; never the command.
+        result = subprocess.run(
+            ["pg_dump", "-Fc", "-f", dump_path, os.environ["PG_DSN"]],
+            capture_output=True, text=True,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(
+                f"pg_dump failed (rc={result.returncode}): {result.stderr.strip()}"
+            )
+
+        service = BlobServiceClient(
+            account_url=f"https://{account}.blob.core.windows.net", credential=key
+        )
+        with open(dump_path, "rb") as dump:
+            service.get_blob_client(container=BACKUP_CONTAINER, blob=blob_name).upload_blob(
+                dump, overwrite=True
+            )
+        context.log.info("uploaded %s to %s: %d bytes",
+                         blob_name, BACKUP_CONTAINER, os.path.getsize(dump_path))
+    finally:
+        os.unlink(dump_path)
+
+
+backup_job = define_asset_job("backup_job", selection=[postgres_backup])
+
+# 03:30 ET nightly — quiet hours, done well before the 09:15 ground-truth pull.
+# Ships off like every schedule; toggled once in the UI (Manual 07).
+nightly_backup = ScheduleDefinition(
+    name="nightly_backup", job=backup_job,
+    cron_schedule="30 3 * * *", execution_timezone="America/New_York",
+)
+
+defs = Definitions(assets=[ground_truth_arrivals, postgres_backup],
+                   jobs=[ground_truth_job, backup_job],
+                   schedules=[daily_ground_truth, nightly_backup])
