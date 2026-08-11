@@ -144,6 +144,43 @@ services:
       postgres:
         condition: service_healthy
 
+  dagster-webserver:
+    build:
+      context: .
+      dockerfile: Dockerfile.dagster
+    image: skynyc-dagster
+    container_name: skynyc-dagster-webserver
+    restart: unless-stopped
+    command: dagster-webserver -h 0.0.0.0 -p 3001 -w workspace.yaml
+    env_file: .env
+    environment:
+      PG_HOST: postgres
+      PG_DSN: postgresql://${POSTGRES_USER:-skynyc}:${POSTGRES_PASSWORD:-skynyc}@postgres:5432/${POSTGRES_DB:-skynyc}
+      TZ: UTC
+    ports:
+      - "127.0.0.1:3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Schedules only tick while the daemon runs — a stopped daemon fails silently
+  # from the UI's point of view (Manual 07).
+  dagster-daemon:
+    image: skynyc-dagster
+    container_name: skynyc-dagster-daemon
+    restart: unless-stopped
+    command: dagster-daemon run -w workspace.yaml
+    env_file: .env
+    environment:
+      PG_HOST: postgres
+      PG_DSN: postgresql://${POSTGRES_USER:-skynyc}:${POSTGRES_PASSWORD:-skynyc}@postgres:5432/${POSTGRES_DB:-skynyc}
+      TZ: UTC
+    depends_on:
+      postgres:
+        condition: service_healthy
+      dagster-webserver:
+        condition: service_started
+
   grafana:
     image: grafana/grafana-oss:11.6.1
     container_name: skynyc-grafana
