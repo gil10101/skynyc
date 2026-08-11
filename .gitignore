@@ -1,0 +1,24 @@
+# local-only: working docs and tooling config, not part of the deliverable
+start_docs/
+.claude/
+
+# secrets
+.env
+
+# data (bind mounts, not docker volumes — prune won't touch them)
+data/
+checkpoints/
+backups/
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# os / editor
+.DS_Store
+
+# local agent context — personal tooling, not part of the deliverable
+CLAUDE.md
