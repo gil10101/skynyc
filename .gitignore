@@ -24,3 +24,4 @@ venv/
 
 # local agent context — personal tooling, not part of the deliverable
 CLAUDE.md
+.playwright-mcp/
