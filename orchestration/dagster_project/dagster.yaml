@@ -1,0 +1,26 @@
+# Dagster instance config — run/event storage in the project Postgres so the
+# webserver and daemon containers share state (sqlite cannot be shared safely
+# across two containers). Tables land in the dedicated `dagster` schema.
+storage:
+  postgres:
+    postgres_db:
+      hostname:
+        env: PG_HOST
+      username:
+        env: POSTGRES_USER
+      password:
+        env: POSTGRES_PASSWORD
+      db_name:
+        env: POSTGRES_DB
+      port: 5432
+      params:
+        options: "-c search_path=dagster"
+
+run_coordinator:
+  module: dagster.core.run_coordinator
+  class: QueuedRunCoordinator
+  config:
+    max_concurrent_runs: 1
+
+telemetry:
+  enabled: false
