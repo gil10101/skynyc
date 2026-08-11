@@ -10,6 +10,8 @@ data/
 checkpoints/
 backups/
 
+docs/
+
 # python
 __pycache__/
 *.py[cod]
