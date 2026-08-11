@@ -82,3 +82,12 @@ test:
 stream:
 	$(COMPOSE) build spark
 	$(COMPOSE) up -d spark
+
+batch:
+	$(COMPOSE) build dagster-webserver
+	$(COMPOSE) up -d dagster-webserver dagster-daemon
+	@echo "dagster UI: http://localhost:3001 (schedules ship OFF — toggle under Automation)"
+
+dbt-build:
+	$(COMPOSE) exec -T dagster-webserver sh -c \
+	  "cd /app/dbt/skynyc_dbt && dbt deps --profiles-dir . -q && dbt build --profiles-dir ."

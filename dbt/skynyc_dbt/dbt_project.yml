@@ -1,0 +1,15 @@
+# SkyNYC dbt project (PRD §9). M3 ships staging + mart_detection_quality;
+# the full DAG (spine, weather join-at-read, impact mart) lands in M4.
+name: skynyc_dbt
+version: "1.0.0"
+profile: skynyc_dbt
+
+model-paths: ["models"]
+test-paths: ["tests"]
+
+models:
+  skynyc_dbt:
+    staging:
+      +materialized: view
+    marts:
+      +materialized: table

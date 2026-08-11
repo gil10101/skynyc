@@ -1,0 +1,17 @@
+version: 2
+
+sources:
+  - name: skynyc
+    database: "{{ env_var('POSTGRES_DB', 'skynyc') }}"
+    schema: public
+    tables:
+      - name: flight_events
+        description: Detected operational events from the Q3 stream (PRD §7).
+        loaded_at_field: detected_at
+        freshness:
+          # Freshness IS the monitoring story: events stale means Spark or a
+          # producer is down — fix upstream, re-running dbt cannot help.
+          warn_after: { count: 1, period: hour }
+          error_after: { count: 3, period: hour }
+      - name: arrivals_ground_truth
+        description: OpenSky nightly-batch arrivals (D-1 freshest, PRD §5.1).

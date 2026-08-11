@@ -1,0 +1,14 @@
+# In-repo profile reading env vars — the file is committed, credentials never
+# are (Manual 06). PG_HOST: localhost from the host, postgres inside compose.
+skynyc_dbt:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('PG_HOST', 'localhost') }}"
+      port: 5432
+      user: "{{ env_var('POSTGRES_USER', 'skynyc') }}"
+      password: "{{ env_var('POSTGRES_PASSWORD', 'skynyc') }}"
+      dbname: "{{ env_var('POSTGRES_DB', 'skynyc') }}"
+      schema: analytics
+      threads: 4

@@ -1,0 +1,21 @@
+version: 2
+
+models:
+  - name: stg_flight_events
+    description: One row per detected event (grain = event_id).
+    columns:
+      - name: event_id
+        tests: [unique, not_null]
+      - name: event_type
+        tests:
+          - accepted_values:
+              values: ["arrival", "holding", "go_around"]
+      - name: airport
+        tests:
+          - accepted_values:
+              values: ["KJFK", "KLGA", "KEWR"]
+  - name: stg_arrivals_gt
+    description: One row per ground-truth arrival (grain = icao24 × airport × est_arrival_ts).
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [icao24, airport, est_arrival_ts]
