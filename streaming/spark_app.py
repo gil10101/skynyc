@@ -1,6 +1,6 @@
-"""SkyNYC Spark Structured Streaming app — M2 queries (PRD §7).
+"""SkyNYC Spark Structured Streaming app — queries Q1-Q3 (PRD §7).
 
-Two queries, each with its own checkpoint directory (Manual 04):
+Three queries, each with its own checkpoint directory (Manual 04):
 
   Q1 `bronze` (trigger 60 s): Kafka -> parse with the explicit envelope schema
       -> drop null lat/lon -> dedupe on (icao24, api_ts) under a 2-minute
@@ -8,11 +8,14 @@ Two queries, each with its own checkpoint directory (Manual 04):
       of record — the API cannot backfill (PRD §2.2).
   Q2 `live` (trigger 10 s): latest record per icao24 per micro-batch ->
       foreachBatch upsert into live_states. Powers the map.
-
-Q3 `events` (stateful detectors) lands in M3.
+  Q3 `events` (trigger 30 s): groupBy(icao24).applyInPandasWithState over the
+      pure-python detector engine -> idempotent upsert into flight_events.
+      90 s processing-time timeout confirms coverage-loss arrivals.
 
 Offsets live in each query's checkpoint, NOT in a Kafka consumer group —
 consumer-group tooling neither shows nor resets these queries (Manual 04).
+Replay for Q3: delete checkpoints/events AND set EVENTS_REPLAY_FROM (epoch ms)
+together — either alone silently no-ops (replay runbook, Manual 04).
 
 Bronze destination: abfss://<container>@<account>.dfs.core.windows.net/states
 when AZURE_STORAGE_ACCOUNT+KEY are set (PRD §8 v1.3); local data/bronze/states
@@ -21,16 +24,20 @@ otherwise — same layout, one path swap, documented fallback.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
+from typing import Any, Iterator
 
 from pyspark.sql import DataFrame, SparkSession, functions as F
+from pyspark.sql.streaming.state import GroupState, GroupStateTimeout
 from pyspark.sql.types import (
     BooleanType, DoubleType, IntegerType, LongType, StringType, StructField, StructType,
 )
 from pyspark.sql.window import Window
 
-from streaming.sinks.pg import upsert_live_states
+from streaming.detectors import engine
+from streaming.sinks.pg import upsert_flight_events, upsert_live_states
 
 log = logging.getLogger("spark_app")
 
@@ -80,18 +87,27 @@ def build_session() -> SparkSession:
     return builder.getOrCreate()
 
 
-def read_states(spark: SparkSession) -> DataFrame:
-    """Kafka source -> parsed, typed envelope rows with an event-time column."""
-    raw = (
+def read_states(spark: SparkSession, replay_from_ms: str | None = None) -> DataFrame:
+    """Kafka source -> parsed, typed envelope rows with an event-time column.
+
+    replay_from_ms maps to startingOffsetsByTimestamp — honored only when the
+    query starts with a FRESH checkpoint; ignored otherwise (Manual 04)."""
+    reader = (
         spark.readStream.format("kafka")
         .option("kafka.bootstrap.servers", os.environ.get("KAFKA_BOOTSTRAP", "kafka:19092"))
         .option("subscribe", TOPIC)
-        .option("startingOffsets", "earliest")  # applies only on a fresh checkpoint (Manual 04)
         .option("maxOffsetsPerTrigger", 50000)  # bound replay batch size after downtime
-        .load()
     )
+    if replay_from_ms:
+        reader = reader.option(
+            "startingOffsetsByTimestamp",
+            json.dumps({TOPIC: {str(p): int(replay_from_ms) for p in range(3)}}),
+        )
+    else:
+        reader = reader.option("startingOffsets", "earliest")
     return (
-        raw.select(F.from_json(F.col("value").cast("string"), ENVELOPE_SCHEMA).alias("m"))
+        reader.load()
+        .select(F.from_json(F.col("value").cast("string"), ENVELOPE_SCHEMA).alias("m"))
         .select("m.*")
         .withColumn("api_time", F.to_timestamp(F.from_unixtime("api_ts")))
     )
@@ -159,13 +175,95 @@ def start_live(spark: SparkSession) -> None:
     )
 
 
+EVENTS_OUTPUT_SCHEMA = StructType([
+    StructField("event_id", StringType()),
+    StructField("icao24", StringType()),
+    StructField("callsign", StringType()),
+    StructField("event_type", StringType()),
+    StructField("airport", StringType()),
+    StructField("event_ts", LongType()),
+    StructField("duration_s", IntegerType()),
+    StructField("details", StringType()),  # JSON string -> jsonb at the sink
+])
+EVENTS_STATE_SCHEMA = StructType([StructField("state_json", StringType())])
+
+
+def detect_events(key: tuple, batches: Iterator, state: GroupState) -> Iterator:
+    """applyInPandasWithState bridge: pandas in/out, pure engine in the middle."""
+    import pandas as pd  # worker-side import
+
+    icao24 = key[0]
+    current = engine.decode_state(state.get()[0] if state.exists else None)
+
+    if state.hasTimedOut:
+        _, events = engine.process(current, [], timed_out=True)
+        state.remove()
+    else:
+        messages: list[dict[str, Any]] = []
+        for pdf in batches:
+            for record in pdf.to_dict("records"):
+                record["icao24"] = icao24
+                messages.append(record)
+        messages.sort(key=lambda m: m["api_ts"])
+        current, events = engine.process(current, messages)
+        if current is None:
+            state.remove()
+        else:
+            state.update((engine.encode_state(current),))
+            state.setTimeoutDuration(engine.STATE_TIMEOUT_MS)
+
+    if events:
+        yield pd.DataFrame([
+            {**e, "details": json.dumps(e["details"] or {})} for e in events
+        ])
+
+
+def start_events(spark: SparkSession) -> None:
+    """Q3 — stateful per-aircraft detection (PRD §7). The replay runbook's
+    EVENTS_REPLAY_FROM lands here as startingOffsetsByTimestamp."""
+    states = read_states(spark, replay_from_ms=os.environ.get("EVENTS_REPLAY_FROM"))
+    detected = (
+        states.select("poll_ts", "api_ts", "icao24", "callsign", "lon", "lat",
+                      "baro_alt_m", "on_ground", "velocity_ms", "track_deg",
+                      "vrate_ms", "category")
+        .groupBy("icao24")
+        .applyInPandasWithState(
+            detect_events,
+            outputStructType=EVENTS_OUTPUT_SCHEMA,
+            stateStructType=EVENTS_STATE_SCHEMA,
+            outputMode="update",
+            timeoutConf=GroupStateTimeout.ProcessingTimeTimeout,
+        )
+    )
+
+    def sink(batch: DataFrame, batch_id: int) -> None:
+        rows = [
+            {**r.asDict(), "details": json.loads(r.details or "{}")}
+            for r in batch.collect()
+        ]
+        upsert_flight_events(rows)
+        if rows:
+            log.info("events batch %d: %d event(s) upserted", batch_id, len(rows))
+
+    (
+        detected.writeStream.queryName("events")
+        .foreachBatch(sink)
+        .option("checkpointLocation", "checkpoints/events")
+        .outputMode("update")
+        .trigger(processingTime="30 seconds")
+        .start()
+    )
+
+
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
     spark = build_session()
     spark.sparkContext.setLogLevel("WARN")
-    log.info("starting queries: bronze -> %s, live -> live_states", bronze_path())
+    log.info("starting queries: bronze -> %s, live -> live_states, events -> flight_events",
+             bronze_path())
     start_bronze(spark)
     start_live(spark)
+    start_events(spark)
     spark.streams.awaitAnyTermination()
 
 

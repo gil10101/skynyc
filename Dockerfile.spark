@@ -21,7 +21,9 @@ WORKDIR /app
 # without this the `streaming` package import fails inside the app.
 ENV PYTHONPATH=/app
 
-RUN pip install --no-cache-dir pyspark==4.0.1 "psycopg[binary]==3.2.3"
+# pandas/pyarrow: applyInPandasWithState (Q3 detectors) runs pandas workers.
+RUN pip install --no-cache-dir pyspark==4.0.1 "psycopg[binary]==3.2.3" \
+    pandas==2.2.3 pyarrow==17.0.0
 
 COPY streaming/ streaming/
 
