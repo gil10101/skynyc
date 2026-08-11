@@ -1,0 +1,14 @@
+# Dashboard provider — loads every dashboard JSON in this directory (Manual 08).
+# The repo is the source of truth: UI edits die unless exported back to
+# skynyc.json and committed.
+apiVersion: 1
+
+providers:
+  - name: skynyc
+    folder: ""
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    updateIntervalSeconds: 30
+    options:
+      path: /etc/grafana/provisioning/dashboards

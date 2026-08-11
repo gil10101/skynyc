@@ -1,0 +1,20 @@
+# SkyNYC Postgres datasource — provisioned as code (Manual 08).
+# $POSTGRES_PASSWORD is interpolated from the grafana container's environment.
+apiVersion: 1
+
+datasources:
+  - name: SkyNYC Postgres
+    uid: skynyc-pg
+    type: postgres
+    access: proxy
+    url: postgres:5432
+    database: skynyc
+    user: skynyc
+    secureJsonData:
+      password: $POSTGRES_PASSWORD
+    jsonData:
+      sslmode: disable
+      postgresVersion: 1600
+      timescaledb: false
+    isDefault: true
+    editable: false

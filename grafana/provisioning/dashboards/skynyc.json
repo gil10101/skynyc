@@ -1,0 +1,128 @@
+{
+  "uid": "skynyc-main",
+  "title": "SkyNYC",
+  "timezone": "utc",
+  "refresh": "15s",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": false,
+  "time": { "from": "now-3h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Live NYC airspace",
+      "description": "Airborne aircraft seen in the last 90 seconds, colored by barometric altitude (m). PRD §10 panel 1.",
+      "type": "geomap",
+      "datasource": { "type": "postgres", "uid": "skynyc-pg" },
+      "gridPos": { "h": 16, "w": 15, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawSql": "SELECT icao24, callsign, latitude, longitude, baro_alt_m, velocity_ms, track_deg, updated_at FROM live_states WHERE updated_at > now() - interval '90 seconds' AND NOT on_ground AND latitude IS NOT NULL AND longitude IS NOT NULL"
+        }
+      ],
+      "options": {
+        "view": { "id": "coords", "lat": 40.7, "lon": -73.95, "zoom": 8.5 },
+        "basemap": { "type": "default", "name": "Basemap" },
+        "layers": [
+          {
+            "type": "markers",
+            "name": "Aircraft",
+            "location": { "mode": "coords", "latitude": "latitude", "longitude": "longitude" },
+            "config": {
+              "style": {
+                "size": { "fixed": 6 },
+                "color": { "field": "baro_alt_m" },
+                "fillOpacity": 0.9,
+                "symbol": { "mode": "fixed", "fixed": "img/icons/marker/plane.svg" },
+                "symbolAlign": { "horizontal": "center", "vertical": "center" },
+                "rotation": { "mode": "field", "field": "track_deg", "fixed": 0, "min": -360, "max": 360 }
+              },
+              "showLegend": true
+            },
+            "tooltip": true
+          }
+        ],
+        "controls": { "showZoom": true, "mouseWheelZoom": true, "showAttribution": true }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "continuous-BlYlRd" },
+          "min": 0,
+          "max": 12000,
+          "unit": "lengthm"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "title": "Current conditions",
+      "description": "Latest observation per station; flight_category is the operational summary. PRD §10 panel 3.",
+      "type": "table",
+      "datasource": { "type": "postgres", "uid": "skynyc-pg" },
+      "gridPos": { "h": 8, "w": 9, "x": 15, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawSql": "SELECT DISTINCT ON (station) station, obs_ts, text_desc, flight_category, wind_speed_kmh, wind_gust_kmh, visibility_m, ceiling_ft FROM weather_obs ORDER BY station, obs_ts DESC"
+        }
+      ],
+      "options": { "showHeader": true },
+      "fieldConfig": {
+        "defaults": { "custom": { "align": "auto" } },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "flight_category" },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  { "type": "value", "options": {
+                    "VFR":  { "color": "green",       "index": 0 },
+                    "MVFR": { "color": "blue",        "index": 1 },
+                    "IFR":  { "color": "red",         "index": 2 },
+                    "LIFR": { "color": "dark-purple", "index": 3 }
+                  } }
+                ]
+              },
+              { "id": "custom.cellOptions", "value": { "type": "color-background" } }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 4,
+      "title": "Pipeline freshness",
+      "description": "Seconds since the newest live_states row — the end-to-end liveness signal (healthy < 90 s).",
+      "type": "stat",
+      "datasource": { "type": "postgres", "uid": "skynyc-pg" },
+      "gridPos": { "h": 8, "w": 9, "x": 15, "y": 8 },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawSql": "SELECT extract(epoch from now() - max(updated_at)) AS staleness_s FROM live_states"
+        }
+      ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 90 },
+              { "color": "red", "value": 300 }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    }
+  ]
+}
