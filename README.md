@@ -30,7 +30,7 @@ is the point.
 
 | | |
 |---|---|
-| ![Spark Structured Streaming UI: the three checkpointed queries](assets/img/spark-streaming-queries.png) *Three checkpointed streaming queries: bronze, live, events* | ![Dagster asset catalog: ground truth pull and nightly backup](assets/img/dagster-assets.png) *Batch layer: daily ground-truth pull, nightly lake backup* |
+| ![Spark streaming query statistics: input rate, process rate, batch durations over hundreds of batches](assets/img/spark-live-query-stats.png) *The live query's statistics: rates, rows, and batch durations across hundreds of micro-batches* | ![Dagster run detail: ground-truth pull with per-airport arrival counts and credit accounting in the event log](assets/img/dagster-gt-run.png) *A ground-truth run: 1,592 arrivals pulled, per-airport counts and API-credit accounting in the log* |
 | ![Derived flight events queried live from Postgres](assets/img/events-live.png) *The product no feed provides: derived arrivals and holding patterns* | ![Azure ADLS Gen2 bronze archive listing](assets/img/azure-lake.png) *The lake: partitioned Parquet archive plus database backups* |
 
 ---
