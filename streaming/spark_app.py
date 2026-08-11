@@ -193,7 +193,10 @@ def detect_events(key: tuple, batches: Iterator, state: GroupState) -> Iterator:
     import pandas as pd  # worker-side import
 
     icao24 = key[0]
-    current = engine.decode_state(state.get()[0] if state.exists else None)
+    # GroupState.getOption is a PROPERTY yielding the state tuple or None —
+    # calling it like a method crashes on the first batch that carries state.
+    stored = state.getOption
+    current = engine.decode_state(stored[0] if stored else None)
 
     if state.hasTimedOut:
         _, events = engine.process(current, [], timed_out=True)
