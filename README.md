@@ -190,6 +190,11 @@ same airport, |Δt| ≤ 10 min against OpenSky's independent arrival records):
 | LaGuardia | 93.3% | 94.1% |
 | Newark | 94.6% | 85.2% |
 
+![Dagster asset detail for the quality mart: raw SQL, per-input data versions, execution history](assets/img/dagster-mart_detection_quality.png)
+*The quality mart as Dagster sees it: the scoring SQL inline, data versions per
+input, and the materialization trail — the validation loop is inspectable, not
+claimed.*
+
 Precision is measured against the full ground-truth day. The recall figures
 above were measured over the window the detection stream was actually running —
 it started mid-day on the first scored day, and counting hours it never saw

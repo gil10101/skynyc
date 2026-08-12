@@ -23,7 +23,7 @@
           "rawQuery": true,
           "rawSql": "SELECT effective_ts AS time, ends_ts AS timeend, airport || ': ' || event AS text, airport AS tags FROM weather_alerts WHERE effective_ts < $__timeTo() AND coalesce(ends_ts, now()) > $__timeFrom()"
         },
-        "filter": { "exclude": false, "ids": [5, 7] }
+        "filter": { "exclude": false, "ids": [5, 7, 9] }
       }
     ]
   },
@@ -343,6 +343,56 @@
           { "matcher": { "id": "byFrameRefID", "options": "MVFR" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "semi-dark-blue" } } ] },
           { "matcher": { "id": "byFrameRefID", "options": "IFR" },  "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "semi-dark-red" } } ] },
           { "matcher": { "id": "byFrameRefID", "options": "LIFR" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "semi-dark-purple" } } ] }
+        ]
+      }
+    },
+    {
+      "id": 9,
+      "title": "Wind by station",
+      "description": "Sustained wind as lines, gusts as points, per station; alert windows overlay. The weather side of every activity panel above it.",
+      "type": "timeseries",
+      "datasource": { "type": "postgres", "uid": "skynyc-pg" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 32 },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "time_series",
+          "rawSql": "SELECT obs_ts AS time, station AS metric, wind_speed_kmh AS value FROM weather_obs WHERE $__timeFilter(obs_ts) AND wind_speed_kmh IS NOT NULL ORDER BY 1"
+        },
+        {
+          "refId": "B",
+          "format": "time_series",
+          "rawSql": "SELECT obs_ts AS time, station || ' gust' AS metric, wind_gust_kmh AS value FROM weather_obs WHERE $__timeFilter(obs_ts) AND wind_gust_kmh IS NOT NULL ORDER BY 1"
+        }
+      ],
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "velocitykmh",
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "KJFK" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "semi-dark-yellow" } } ] },
+          { "matcher": { "id": "byName", "options": "KLGA" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "semi-dark-blue" } } ] },
+          { "matcher": { "id": "byName", "options": "KEWR" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "semi-dark-green" } } ] },
+          { "matcher": { "id": "byRegexp", "options": ".* gust" }, "properties": [
+            { "id": "custom.drawStyle", "value": "points" },
+            { "id": "custom.showPoints", "value": "always" },
+            { "id": "custom.pointSize", "value": 5 }
+          ] },
+          { "matcher": { "id": "byName", "options": "KJFK gust" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "semi-dark-yellow" } } ] },
+          { "matcher": { "id": "byName", "options": "KLGA gust" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "semi-dark-blue" } } ] },
+          { "matcher": { "id": "byName", "options": "KEWR gust" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "semi-dark-green" } } ] }
         ]
       }
     }
