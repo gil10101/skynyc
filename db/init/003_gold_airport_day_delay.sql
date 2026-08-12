@@ -8,7 +8,7 @@
 --
 -- Apply by hand (init scripts only run on an empty volume — Manual 05):
 --   docker compose exec -T postgres psql -U skynyc -d skynyc \
---     < db/migrations/003_gold_airport_day_delay.sql
+--     < db/init/003_gold_airport_day_delay.sql
 
 CREATE TABLE IF NOT EXISTS gold_airport_day_delay (
     flight_date              date             NOT NULL,
