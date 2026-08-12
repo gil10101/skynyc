@@ -42,6 +42,12 @@ serverless SQL warehouse over Unity Catalog external tables is the analyst's win
 the history. BTS serves no PREZIP files for 1990-1999 (verified against both naming
 schemes) — the gap is landed around, documented, and self-heals if the source restores it.
 
+Deliberately single-node compute: bronze is per-archive by construction (ZIPs are not
+splittable), and the subscription's SKU allow-list and 4-vCPU family quota cap the cluster
+at one machine — worker count is a single Terraform variable when the ceiling lifts. The
+whole build ran on roughly ten dollars of a $200 credit grant, with the budget alert never
+firing.
+
 ![Databricks multi-task run: bronze, silver, gold all green with durations](assets/img/databricks-run-dag.png)
 *The medallion build, end to end: 344 monthly archives to bronze in 2h58m, the 181M-row
 typed dedupe in 31m, weather parse and gold marts in minutes. Databricks labels Jobs-API
