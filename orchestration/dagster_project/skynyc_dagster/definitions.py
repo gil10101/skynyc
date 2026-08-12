@@ -15,11 +15,14 @@ import os
 import subprocess
 import tempfile
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import psycopg
 import requests
 from azure.storage.blob import BlobServiceClient
 from dagster import (
+    AssetKey,
+    AssetSelection,
     DailyPartitionsDefinition,
     Definitions,
     ScheduleDefinition,
@@ -27,6 +30,7 @@ from dagster import (
     define_asset_job,
     build_schedule_from_partitioned_job,
 )
+from dagster_dbt import DbtCliResource, dbt_assets
 
 from producers.common.token_manager import TokenManager
 
@@ -345,9 +349,89 @@ monthly_lakehouse = ScheduleDefinition(
     cron_schedule="0 7 6 * *", execution_timezone="America/New_York",
 )
 
+# --- dbt DAG (PRD §9, M4) ---------------------------------------------------
+# The dbt project is discovered from the manifest baked at image build
+# (Dockerfile) — every model becomes an asset, dependencies included, nothing
+# registered by hand (Manual 06).
+
+DBT_PROJECT_DIR = Path(__file__).resolve().parents[3] / "dbt" / "skynyc_dbt"
+
+
+@dbt_assets(manifest=DBT_PROJECT_DIR / "target" / "manifest.json")
+def skynyc_dbt_models(context, dbt: DbtCliResource):  # noqa: ANN001, ANN201 — dagster-dbt's own signature
+    yield from dbt.cli(["build"], context=context).stream()
+    # Freshness runs in the same tick, after the build: a green build over
+    # stale sources is still a red pipeline, and freshness IS the monitoring
+    # story (PRD §9). error-level staleness fails this run on purpose.
+    dbt.cli(["source", "freshness"]).wait()
+
+
+@asset(group_name="ground_truth", deps=[AssetKey("mart_detection_quality")])
+def detection_quality_report(context) -> None:  # noqa: ANN001 — unannotated per dagster's context rules
+    """Publish the latest fully scored day's precision/recall (PRD §9).
+
+    Reads the quality mart's newest day whose ground truth has landed and logs
+    each airport against the P >= 0.85 / R >= 0.80 targets. Warns rather than
+    fails below target: a bad score is a tuning signal, not a broken pipeline.
+    """
+    with psycopg.connect(os.environ["PG_DSN"]) as connection:
+        rows = connection.execute(
+            """
+            select quality_date, airport, arrivals_detected, arrivals_gt,
+                   "precision", recall
+            from analytics.mart_detection_quality
+            where "precision" is not null
+            order by quality_date desc, airport
+            limit 3
+            """
+        ).fetchall()
+    if not rows:
+        context.log.warning("no scored days in mart_detection_quality yet")
+        return
+    for day, airport, detected, gt, precision, recall in rows:
+        met = precision >= 0.85 and (recall or 0) >= 0.80
+        log = context.log.info if met else context.log.warning
+        log("%s %s: precision=%.4f recall=%.4f (detected=%d gt=%d, targets P>=0.85 R>=0.80)",
+            day, airport, precision, recall, detected, gt)
+
+
+dbt_build_job = define_asset_job(
+    "dbt_build_job", selection=AssetSelection.assets(skynyc_dbt_models)
+)
+
+# Hourly build keeps the marts at most an hour behind the stream (PRD §9).
+hourly_dbt = ScheduleDefinition(
+    name="hourly_dbt", job=dbt_build_job,
+    cron_schedule="0 * * * *", execution_timezone="America/New_York",
+)
+
+# 09:45 ET: the 09:15 ground-truth pull has landed and the quality mart must
+# be rebuilt WITH the new day before the report reads it — the 09:00 hourly
+# build predates the pull, so this job carries its own subsetted rebuild.
+daily_quality_job = define_asset_job(
+    "daily_quality_job",
+    selection=(
+        AssetSelection.keys("mart_detection_quality").upstream()
+        | AssetSelection.keys("detection_quality_report")
+    ),
+)
+
+daily_quality = ScheduleDefinition(
+    name="daily_quality", job=daily_quality_job,
+    cron_schedule="45 9 * * *", execution_timezone="America/New_York",
+)
+
 defs = Definitions(
     assets=[ground_truth_arrivals, postgres_backup,
-            databricks_medallion_run, gold_airport_day_delay_pg],
-    jobs=[ground_truth_job, backup_job, lakehouse_job],
-    schedules=[daily_ground_truth, nightly_backup, monthly_lakehouse],
+            databricks_medallion_run, gold_airport_day_delay_pg,
+            skynyc_dbt_models, detection_quality_report],
+    jobs=[ground_truth_job, backup_job, lakehouse_job, dbt_build_job, daily_quality_job],
+    schedules=[daily_ground_truth, nightly_backup, monthly_lakehouse,
+               hourly_dbt, daily_quality],
+    resources={
+        "dbt": DbtCliResource(
+            project_dir=os.fspath(DBT_PROJECT_DIR),
+            profiles_dir=os.fspath(DBT_PROJECT_DIR),
+        )
+    },
 )

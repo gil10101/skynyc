@@ -20,6 +20,7 @@ RUN apt-get update \
 # whose engine does not support the postgres adapter.
 RUN pip install --no-cache-dir \
     dagster==1.8.13 dagster-webserver==1.8.13 dagster-postgres==0.24.13 \
+    dagster-dbt==0.24.13 \
     dbt-core==1.8.7 dbt-postgres==1.8.2 \
     requests==2.32.3 "psycopg[binary]==3.2.3" pydantic==2.9.2 \
     azure-storage-blob==12.23.1
@@ -27,6 +28,14 @@ RUN pip install --no-cache-dir \
 COPY producers/ producers/
 COPY orchestration/ orchestration/
 COPY dbt/ dbt/
+
+# The dbt DAG is discovered from the manifest at import time (Manual 06), so
+# parse it into the image. Consequence: model changes need an image rebuild,
+# not just a container restart — same bake rule as the Dagster code itself.
+# `dbt parse` needs no database; the profile's env-var defaults satisfy it.
+RUN cd dbt/skynyc_dbt \
+ && dbt deps --profiles-dir . -q \
+ && dbt parse --profiles-dir . -q
 
 RUN mkdir -p $DAGSTER_HOME \
  && cp orchestration/dagster_project/dagster.yaml $DAGSTER_HOME/dagster.yaml
