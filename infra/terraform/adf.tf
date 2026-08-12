@@ -10,9 +10,6 @@ resource "azurerm_data_factory" "this" {
   resource_group_name = azurerm_resource_group.this.name
 }
 
-# TranStats' certificate chain is served incomplete; validation stays off for this
-# one host (public, unauthenticated data — integrity is enforced by row counts and
-# schema checks downstream, not transport).
 resource "azurerm_data_factory_linked_custom_service" "http_transtats" {
   name            = "ls_http_transtats"
   data_factory_id = azurerm_data_factory.this.id
@@ -20,7 +17,7 @@ resource "azurerm_data_factory_linked_custom_service" "http_transtats" {
   type_properties_json = jsonencode({
     url                               = "https://transtats.bts.gov"
     authenticationType                = "Anonymous"
-    enableServerCertificateValidation = false
+    enableServerCertificateValidation = true
   })
 }
 
