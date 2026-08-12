@@ -20,7 +20,9 @@ ground_truth as (
 detected_scored as (
     select
         d.airport,
-        date_trunc('day', d.event_ts)::date as quality_date,
+        -- UTC day pinned explicitly: a bare cast follows the session
+        -- TimeZone and would shift day buckets in a non-UTC session.
+        (d.event_ts at time zone 'UTC')::date as quality_date,
         exists (
             select 1 from ground_truth g
             where g.icao24 = d.icao24
@@ -33,7 +35,7 @@ detected_scored as (
 gt_scored as (
     select
         g.airport,
-        date_trunc('day', g.est_arrival_ts)::date as quality_date,
+        (g.est_arrival_ts at time zone 'UTC')::date as quality_date,
         exists (
             select 1 from detected d
             where d.icao24 = g.icao24
