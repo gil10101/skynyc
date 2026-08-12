@@ -34,8 +34,8 @@ DEFAULT_BBOX = "40.0,-75.0,41.4,-72.9"
 OBS_MAX_AGE = timedelta(hours=2)  # PRD §13 M0 AC
 CREDIT_DEGRADE_FLOOR = 500  # PRD §5.1: below this, producers drop to 60 s polling
 
-OK = "✔"
-FAIL = "✘"
+OK = "[PASS]"
+FAIL = "[FAIL]"
 
 
 def load_dotenv(path: Path) -> None:

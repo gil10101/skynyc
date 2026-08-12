@@ -60,14 +60,66 @@ is the point.
 | Kafka (single node, KRaft) | Durable buffer and 7-day replay log | Not here for throughput (~5 msg/s) — here because the upstream API serves at most 1 h of history, so the retained log is the only replay substrate detector tuning has |
 | Spark Structured Streaming | Bronze archive, live-position upserts, and stateful per-aircraft event detection (`applyInPandasWithState`) | Single-node `local[*]` by design; the code is cluster-portable |
 | Plain Python consumer | Weather topics → Postgres upserts | 3 messages per 5 minutes does not need distributed compute |
-| Azure ADLS Gen2 | The lake: immutable bronze archive + nightly backups | Compute is disposable, storage is not — the one place cloud earns its keep here |
+| Azure ADLS Gen2 | The lake: immutable bronze archive + nightly backups | Compute is disposable, storage is not — the one place a hyperscaler earns its keep here |
+| DigitalOcean droplet | The compute host: all nine containers, 24/7 | Flat always-on workload; burst-priced clouds would charge a premium for a profile this steady |
 | Postgres 16 | Serving layer and warehouse | |
 | dbt | Staging → marts; tests and source freshness double as pipeline monitoring | |
 | Dagster | Batch only: daily ground-truth pull, scheduled builds | Streams are supervised by Docker restart policies — an orchestrator's run model is the wrong shape for an infinite process |
 | Grafana OSS | Live geomap + operational panels, provisioned from files | The repo is the dashboard; UI edits are exported back or they die |
 
-Runtime: a single 8 GB VPS running the full compose stack. The laptop is a
-development machine only.
+## Deployment topology
+
+The split that matters: **compute is disposable, storage is not.** Everything
+that computes runs on one rented box; everything that must survive that box
+lives in object storage.
+
+```
+ Laptop (dev only)                DigitalOcean droplet, NYC3          Azure (eastus)
+ ------------------               ---------------------------        --------------------
+ edit, test, commit    deploy.sh  9 containers via compose:          skynycbronzegil
+ pytest + ruff        ---------->   kafka, postgres, grafana,        (StorageV2 + HNS, LRS)
+ SSH tunnels for UIs    (rsync)     spark, 2 producers, consumer,      bronze/  Parquet archive
+                                    dagster webserver + daemon         backups/ nightly pg_dump
+```
+
+**Compute — DigitalOcean droplet** (Basic tier, Ubuntu 24.04, Docker Compose):
+started at 4 GB for the ingestion phase, resized in place to 8 GB the day the
+Spark driver (4 GB heap) deployed — droplet resizes preserve the disk, so the
+upgrade cost about a minute of downtime and the restart policies brought the
+stack back unaided. Current steady-state: about 4.7 GB RAM in use across the
+nine containers, Spark owning half of it. Kafka data, Postgres data, and Spark
+checkpoints live on the droplet's disk in named volumes: they are the working
+set, not the archive, and losing them costs at most the Kafka retention window
+of re-derivable state.
+
+**Storage — Azure ADLS Gen2** (StorageV2 with hierarchical namespace, LRS,
+public access disabled, TLS 1.2 floor): the bronze Parquet archive Spark writes
+via `abfss://`, and the nightly `pg_dump` the batch layer uploads. A lifecycle
+rule tiers archive blobs to Cool at 30 days. This is the system of record —
+the upstream API serves at most one hour of history, so if the archive is lost,
+it is lost. Provisioned by `scripts/provision_azure.sh`; the storage cost
+rounds to pennies.
+
+Why this pairing instead of one cloud for both: an 8 GB droplet is a fraction
+of the price of the equivalent on-demand EC2 instance, and this workload has
+no burst profile that would reward per-second billing — it is a flat 24/7 hum.
+Object storage is the piece where a hyperscaler genuinely earns its keep
+(durability SLAs a single droplet cannot approach), so the lake goes there and
+nothing else does. Managed Kafka and cloud warehouses stay out: at 5 msg/s and
+a few thousand events a day they would be cost without engineering content.
+
+**Security posture:** every published container port binds `127.0.0.1` — not
+as a preference but because Docker programs its own iptables rules ahead of
+host firewalls, so a bare `9092:9092` on a public droplet is internet-exposed
+no matter what ufw says. Reaching Grafana (3000), Dagster (3001), or the Spark
+UI (4040) means an SSH tunnel. The host allows SSH only, key-only
+authentication, unattended security upgrades on. Secrets live in `.env`, which
+is gitignored and travels only over the deploy channel.
+
+**Operations:** `scripts/deploy.sh` is the whole deploy story — rsync the
+working tree, install Docker and swap on a fresh host, apply numbered
+migrations idempotently, start the stack, verify. Re-running it is the update
+path. The server is not a place where code is edited.
 
 ## Event detection
 
@@ -100,10 +152,10 @@ yet.
 
 | Phase | Scope | Status |
 |---|---|---|
-| M0 Foundations | Compose stack, schema, topics, live smoke test | ✅ |
-| M1 Ingestion | Producers with credit guard + unit-aware parsing, weather consumer, parser suite over recorded fixtures | ✅ |
-| M2 Live map | Spark bronze→Azure + live positions, provisioned dashboard | ✅ |
-| M3 Detection & validation | Detectors + fixture suite, ground-truth pull, quality mart | ✅ built & live · first P/R score pending first full detection day vs. nightly-batch ground truth |
+| M0 Foundations | Compose stack, schema, topics, live smoke test | Complete |
+| M1 Ingestion | Producers with credit guard + unit-aware parsing, weather consumer, parser suite over recorded fixtures | Complete |
+| M2 Live map | Spark bronze→Azure + live positions, provisioned dashboard | Complete |
+| M3 Detection & validation | Detectors + fixture suite, ground-truth pull, quality mart | Built and live; first precision/recall score lands with the first full detection day vs. the nightly-batch ground truth |
 | M4 Modeling | Full dbt DAG (hourly facts, weather join-at-read, impact mart), scheduled builds | — |
 | M5 Dashboard & soak | Remaining panels, alert overlays, 7-day continuous run | — |
 | M6 Analysis & packaging | The written answer, demo capture | — |
