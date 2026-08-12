@@ -45,7 +45,9 @@ resource "databricks_job" "medallion" {
     job_cluster_key = "single_node"
     new_cluster {
       spark_version = "15.4.x-scala2.12"
-      node_type_id  = "Standard_DS3_v2"
+      # DS3_v2 is SKU-restricted for this subscription in eastus (stockout on
+      # first run); D4as_v5 is the same 4 vCPU with 16 GB and available quota.
+      node_type_id  = "Standard_D4as_v5"
       num_workers   = 0
       spark_conf    = local.spark_conf
       custom_tags   = { "ResourceClass" = "SingleNode" }
