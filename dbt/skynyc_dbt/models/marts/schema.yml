@@ -21,3 +21,74 @@ models:
         tests: [not_null]
       - name: arrivals_gt
         tests: [not_null]
+  - name: fct_airport_hourly
+    description: >
+      One row per airport per UTC hour: detected activity, ground-truth
+      arrivals (null until that day's GT pull lands), and the weather in
+      effect. The dashboard's scatter panel reads this directly (PRD §10).
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [airport, hour_ts]
+    columns:
+      - name: airport
+        tests:
+          - not_null
+          - accepted_values:
+              values: ["KJFK", "KLGA", "KEWR"]
+      - name: hour_ts
+        tests: [not_null]
+      - name: arrivals_detected
+        tests: [not_null]
+      - name: flight_category
+        tests:
+          - accepted_values:
+              values: ["VFR", "MVFR", "IFR", "LIFR"]
+  - name: fct_events_enriched
+    description: >
+      One row per detected event with the weather observation valid at event
+      time (obs_ts <= event_ts < next obs, PRD §7 join-at-read). Events before
+      the first observation carry null weather.
+    columns:
+      - name: event_id
+        tests: [unique, not_null]
+      - name: event_type
+        tests:
+          - accepted_values:
+              values: ["arrival", "holding", "go_around"]
+      - name: airport
+        tests:
+          - not_null
+          - accepted_values:
+              values: ["KJFK", "KLGA", "KEWR"]
+      - name: flight_category
+        tests:
+          - accepted_values:
+              values: ["VFR", "MVFR", "IFR", "LIFR"]
+  - name: mart_weather_impact
+    description: >
+      One row per airport per flight category per wind bucket: arrival rate,
+      holding minutes per hour, and go-around rate over the hours observed in
+      that condition — the answer to the business question (PRD §1). Airport
+      is in the grain because conditions are per-station; pooling would let
+      airport mix masquerade as weather impact.
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [airport, flight_category, wind_bucket]
+    columns:
+      - name: airport
+        tests:
+          - not_null
+          - accepted_values:
+              values: ["KJFK", "KLGA", "KEWR"]
+      - name: flight_category
+        tests:
+          - not_null
+          - accepted_values:
+              values: ["VFR", "MVFR", "IFR", "LIFR"]
+      - name: wind_bucket
+        tests:
+          - not_null
+          - accepted_values:
+              values: ["calm", "breezy", "windy", "unknown"]
+      - name: airport_hours
+        tests: [not_null]

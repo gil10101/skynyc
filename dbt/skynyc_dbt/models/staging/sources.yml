@@ -22,3 +22,15 @@ sources:
           # off (Manual 07).
           warn_after: { count: 2, period: day }
           error_after: { count: 4, period: day }
+      - name: weather_obs
+        description: METAR observations, unit-converted at ingest (PRD §5.2).
+        loaded_at_field: obs_ts
+        freshness:
+          # Reports are roughly hourly, so two hours of silence means the
+          # weather producer or its consumer is down (PRD §9 threshold).
+          warn_after: { count: 2, period: hour }
+          error_after: { count: 6, period: hour }
+      - name: weather_alerts
+        description: >
+          NWS alerts fanned out per airport. No freshness check: a long stretch
+          with no active alert is normal weather, not a dead producer.

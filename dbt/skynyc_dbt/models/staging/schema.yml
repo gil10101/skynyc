@@ -12,6 +12,13 @@ models:
         tests: [unique, not_null]
       - name: icao24
         tests: [not_null]
+      - name: duration_s
+        tests:
+          # Detector contract: a holding event without a duration silently
+          # undercounts holding_minutes downstream — fail here, at the source.
+          - not_null:
+              config:
+                where: "event_type = 'holding'"
       - name: event_type
         tests:
           - accepted_values:
@@ -25,3 +32,33 @@ models:
     tests:
       - dbt_utils.unique_combination_of_columns:
           combination_of_columns: [icao24, airport, est_arrival_ts]
+  - name: stg_weather_obs
+    description: One row per station per observation timestamp (grain = station × obs_ts).
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [station, obs_ts]
+    columns:
+      - name: station
+        tests:
+          - not_null
+          - accepted_values:
+              values: ["KJFK", "KLGA", "KEWR"]
+      - name: obs_ts
+        tests: [not_null]
+      - name: flight_category
+        tests:
+          - accepted_values:
+              values: ["VFR", "MVFR", "IFR", "LIFR"]
+  - name: stg_weather_alerts
+    description: One row per alert per covered airport (grain = alert_id × airport).
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [alert_id, airport]
+    columns:
+      - name: alert_id
+        tests: [not_null]
+      - name: airport
+        tests:
+          - not_null
+          - accepted_values:
+              values: ["KJFK", "KLGA", "KEWR"]

@@ -1,0 +1,35 @@
+version: 2
+
+models:
+  - name: int_hours_spine
+    description: >
+      One row per airport per UTC hour, from the first detected event to the
+      last fully elapsed hour. The scaffold every hourly model joins onto —
+      quiet hours exist as rows so rates divide by observed time.
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [airport, hour_ts]
+    columns:
+      - name: airport
+        tests:
+          - not_null
+          - accepted_values:
+              values: ["KJFK", "KLGA", "KEWR"]
+      - name: hour_ts
+        tests: [not_null]
+  - name: int_weather_hourly
+    description: >
+      One row per airport per hour: the last-known observation at that hour
+      (join-at-read, PRD §7) plus any overlapping alert types.
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [airport, hour_ts]
+    columns:
+      - name: airport
+        tests: [not_null]
+      - name: hour_ts
+        tests: [not_null]
+      - name: flight_category
+        tests:
+          - accepted_values:
+              values: ["VFR", "MVFR", "IFR", "LIFR"]
