@@ -21,6 +21,19 @@ resource "azurerm_storage_account" "lake" {
   min_tls_version          = "TLS1_2"
   allow_nested_items_to_be_public = false
   https_traffic_only_enabled      = true
+
+  # Deletion insurance: a wiped Delta tree is otherwise recoverable only by
+  # re-ingesting from the landing zone, which costs hours of cluster time.
+  # Soft delete makes blob and container deletions reversible for 7 days at
+  # negligible storage cost. It does not version overwrites.
+  blob_properties {
+    delete_retention_policy {
+      days = 7
+    }
+    container_delete_retention_policy {
+      days = 7
+    }
+  }
 }
 
 # Pre-existing containers (v1.3): streaming bronze + pg_dump backups.
