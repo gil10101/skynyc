@@ -64,7 +64,12 @@ select
     coalesce(g.arrivals_gt, 0) as arrivals_gt,
     coalesce(d.detected_matched, 0) as detected_matched,
     coalesce(g.gt_matched, 0) as gt_matched,
-    round(d.detected_matched::numeric / nullif(d.arrivals_detected, 0), 4) as "precision",
+    -- Ground truth arrives D-1 (PRD §5.1): the most recent detected day has no
+    -- GT rows yet, and 0 matches against an absent reference is "unscored",
+    -- not 0% precision. Score only days whose GT pull has landed.
+    case when coalesce(g.arrivals_gt, 0) > 0
+         then round(d.detected_matched::numeric / nullif(d.arrivals_detected, 0), 4)
+    end as "precision",
     round(g.gt_matched::numeric / nullif(g.arrivals_gt, 0), 4) as recall
 from detected_daily d
 full outer join gt_daily g using (airport, quality_date)
