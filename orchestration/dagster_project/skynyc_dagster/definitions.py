@@ -171,6 +171,166 @@ nightly_backup = ScheduleDefinition(
     cron_schedule="30 3 * * *", execution_timezone="America/New_York",
 )
 
-defs = Definitions(assets=[ground_truth_arrivals, postgres_backup],
-                   jobs=[ground_truth_job, backup_job],
-                   schedules=[daily_ground_truth, nightly_backup])
+# --- Historical lakehouse (PRD §13 M4A, v1.4) -------------------------------
+# Dagster is the single control plane: ADF lands raw files on its own trigger,
+# but every transform is a Databricks job run that THIS asset starts and waits
+# on via the Jobs API. Nothing in Databricks is scheduled from Databricks.
+
+DATABRICKS_POLL_S = 60
+DATABRICKS_MAX_WAIT_S = 6 * 3600  # full-history rebuild fits well inside this
+
+UPSERT_GOLD = """
+INSERT INTO gold_airport_day_delay (
+  flight_date, airport, arrivals_scheduled, cancelled, cancelled_weather,
+  avg_arr_delay_min, p90_arr_delay_min, arrivals_delayed_15,
+  weather_delay_min_total, nas_delay_min_total, pct_obs_ifr_or_worse,
+  min_visibility_sm, min_ceiling_ft, obs_count, worst_category
+) VALUES (
+  %(flight_date)s, %(airport)s, %(arrivals_scheduled)s, %(cancelled)s, %(cancelled_weather)s,
+  %(avg_arr_delay_min)s, %(p90_arr_delay_min)s, %(arrivals_delayed_15)s,
+  %(weather_delay_min_total)s, %(nas_delay_min_total)s, %(pct_obs_ifr_or_worse)s,
+  %(min_visibility_sm)s, %(min_ceiling_ft)s, %(obs_count)s, %(worst_category)s
+)
+ON CONFLICT (flight_date, airport) DO UPDATE SET
+  arrivals_scheduled = EXCLUDED.arrivals_scheduled,
+  cancelled = EXCLUDED.cancelled,
+  cancelled_weather = EXCLUDED.cancelled_weather,
+  avg_arr_delay_min = EXCLUDED.avg_arr_delay_min,
+  p90_arr_delay_min = EXCLUDED.p90_arr_delay_min,
+  arrivals_delayed_15 = EXCLUDED.arrivals_delayed_15,
+  weather_delay_min_total = EXCLUDED.weather_delay_min_total,
+  nas_delay_min_total = EXCLUDED.nas_delay_min_total,
+  pct_obs_ifr_or_worse = EXCLUDED.pct_obs_ifr_or_worse,
+  min_visibility_sm = EXCLUDED.min_visibility_sm,
+  min_ceiling_ft = EXCLUDED.min_ceiling_ft,
+  obs_count = EXCLUDED.obs_count,
+  worst_category = EXCLUDED.worst_category
+"""
+
+GOLD_EXPORT_PREFIX = "gold_export/airport_day_delay/"
+GOLD_NUMERIC_INTS = (
+    "arrivals_scheduled", "cancelled", "cancelled_weather", "arrivals_delayed_15", "obs_count",
+)
+GOLD_NUMERIC_FLOATS = (
+    "avg_arr_delay_min", "p90_arr_delay_min", "weather_delay_min_total",
+    "nas_delay_min_total", "pct_obs_ifr_or_worse", "min_visibility_sm", "min_ceiling_ft",
+)
+
+
+@asset(group_name="lakehouse")
+def databricks_medallion_run(context) -> None:  # noqa: ANN001 — unannotated per dagster's context rules
+    """Start the skynyc-medallion-build job and wait for a terminal state.
+
+    Uses the Jobs API directly (run-now + poll) — a heavier integration library
+    is not warranted for one job. Without workspace credentials in the
+    environment there is nothing to trigger — warn and skip, same contract as
+    the backup asset.
+    """
+    host = os.environ.get("DATABRICKS_HOST")
+    token = os.environ.get("DATABRICKS_TOKEN")
+    job_id = os.environ.get("MEDALLION_JOB_ID")
+    if not host or not token or not job_id:
+        context.log.warning(
+            "DATABRICKS_HOST/DATABRICKS_TOKEN/MEDALLION_JOB_ID not set — skipping medallion run"
+        )
+        return
+
+    headers = {"Authorization": f"Bearer {token}"}
+    start = requests.post(
+        f"{host}/api/2.1/jobs/run-now",
+        headers=headers, json={"job_id": int(job_id)}, timeout=TIMEOUT_S,
+    )
+    start.raise_for_status()
+    run_id = start.json()["run_id"]
+    context.log.info("started medallion run %s", run_id)
+
+    import time
+
+    waited = 0
+    while waited < DATABRICKS_MAX_WAIT_S:
+        time.sleep(DATABRICKS_POLL_S)
+        waited += DATABRICKS_POLL_S
+        run = requests.get(
+            f"{host}/api/2.1/jobs/runs/get",
+            headers=headers, params={"run_id": run_id}, timeout=TIMEOUT_S,
+        )
+        run.raise_for_status()
+        state = run.json().get("state", {})
+        life = state.get("life_cycle_state")
+        if life == "TERMINATED":
+            result = state.get("result_state")
+            if result != "SUCCESS":
+                raise RuntimeError(f"medallion run {run_id} finished {result}: "
+                                   f"{state.get('state_message', '')}")
+            context.log.info("medallion run %s SUCCESS after %ds", run_id, waited)
+            return
+        if life in ("INTERNAL_ERROR", "SKIPPED"):
+            raise RuntimeError(f"medallion run {run_id} ended {life}: "
+                               f"{state.get('state_message', '')}")
+        if waited % 600 == 0:
+            context.log.info("medallion run %s still %s (%ds)", run_id, life, waited)
+    raise TimeoutError(f"medallion run {run_id} exceeded {DATABRICKS_MAX_WAIT_S}s")
+
+
+@asset(group_name="lakehouse", deps=[databricks_medallion_run])
+def gold_airport_day_delay_pg(context) -> None:  # noqa: ANN001 — unannotated per dagster's context rules
+    """Download the gold CSV export from the lake and upsert into Postgres.
+
+    The mart is small by construction (one row per airport-day), so a CSV
+    export + upsert keeps Postgres the only serving store without teaching it
+    to read Delta. Empty CSV fields become NULL — never zero.
+    """
+    import csv
+    import io
+
+    account = os.environ.get("AZURE_STORAGE_ACCOUNT")
+    key = os.environ.get("AZURE_STORAGE_KEY")
+    if not account or not key:
+        context.log.warning("Azure credentials not set — skipping gold load")
+        return
+
+    service = BlobServiceClient(
+        account_url=f"https://{account}.blob.core.windows.net", credential=key
+    )
+    container = service.get_container_client("lake")
+    parts = [b.name for b in container.list_blobs(name_starts_with=GOLD_EXPORT_PREFIX)
+             if b.name.endswith(".csv")]
+    if not parts:
+        raise FileNotFoundError(f"no CSV under lake/{GOLD_EXPORT_PREFIX} — did gold_marts run?")
+
+    rows: list[dict] = []
+    for name in parts:
+        text = container.download_blob(name).readall().decode("utf-8")
+        for record in csv.DictReader(io.StringIO(text)):
+            row = {k: (v if v != "" else None) for k, v in record.items()}
+            for col in GOLD_NUMERIC_INTS:
+                row[col] = int(float(row[col])) if row.get(col) is not None else None
+            for col in GOLD_NUMERIC_FLOATS:
+                row[col] = float(row[col]) if row.get(col) is not None else None
+            rows.append(row)
+
+    with psycopg.connect(os.environ["PG_DSN"]) as connection:
+        with connection.cursor() as cursor:
+            cursor.executemany(UPSERT_GOLD, rows)
+        connection.commit()
+    context.log.info("upserted %d gold airport-day rows from %d export file(s)",
+                     len(rows), len(parts))
+
+
+lakehouse_job = define_asset_job(
+    "lakehouse_job", selection=[databricks_medallion_run, gold_airport_day_delay_pg]
+)
+
+# Day 6 monthly, 07:00 ET — the ADF landing trigger runs day 5, so the transform
+# sees the new month. Ships off like every schedule (Manual 07).
+monthly_lakehouse = ScheduleDefinition(
+    name="monthly_lakehouse", job=lakehouse_job,
+    cron_schedule="0 7 6 * *", execution_timezone="America/New_York",
+)
+
+defs = Definitions(
+    assets=[ground_truth_arrivals, postgres_backup,
+            databricks_medallion_run, gold_airport_day_delay_pg],
+    jobs=[ground_truth_job, backup_job, lakehouse_job],
+    schedules=[daily_ground_truth, nightly_backup, monthly_lakehouse],
+)

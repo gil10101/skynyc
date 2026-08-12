@@ -28,6 +28,8 @@ help:
 	@echo "  batch   build + start dagster webserver + daemon (UI on :3001)"
 	@echo "  dbt-build  dbt deps + build (staging, marts, tests) inside the dagster image"
 	@echo "  backup  run the postgres_backup asset once (pg_dump -Fc -> Azure backups)"
+	@echo "  lake-backfill  land the full BTS/IEM history via ADF (one-time, ~470 files)"
+	@echo "  lake-run       run the Databricks medallion build + gold->PG via Dagster"
 
 up:
 	$(COMPOSE) up -d
@@ -100,3 +102,18 @@ dbt-build:
 backup:
 	$(COMPOSE) exec -T dagster-webserver dagster asset materialize \
 	  -m skynyc_dagster.definitions --select postgres_backup
+
+# One-time full-history landing (PRD §13 M4A). Generates the month list up to
+# the freshest published month (~2-month reporting lag) and hands both ADF
+# pipelines their parameters. Idempotent: re-landing overwrites the same paths.
+lake-backfill:
+	python3 scripts/gen_backfill_params.py $$(date -v-3m +%Y) $$(date -v-3m +%-m) /tmp/skynyc-backfill
+	az datafactory pipeline create-run -g skynyc-rg --factory-name skynyc-adf \
+	  --name pl_land_bts --parameters @/tmp/skynyc-backfill/bts_backfill.json
+	az datafactory pipeline create-run -g skynyc-rg --factory-name skynyc-adf \
+	  --name pl_land_iem --parameters @/tmp/skynyc-backfill/iem_backfill.json
+
+# Full medallion build + gold->PG upsert, through Dagster (the control plane).
+lake-run:
+	$(COMPOSE) exec -T dagster-webserver dagster asset materialize \
+	  -m skynyc_dagster.definitions --select databricks_medallion_run,gold_airport_day_delay_pg

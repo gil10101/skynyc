@@ -25,3 +25,9 @@ venv/
 # local agent context — personal tooling, not part of the deliverable
 CLAUDE.md
 .playwright-mcp/
+
+# terraform working dirs — providers are binaries; lockfile IS committed
+infra/terraform/**/.terraform/
+infra/terraform/**/tfplan
+infra/terraform/tfplan
+.terraform/
