@@ -4,9 +4,26 @@
   "timezone": "utc",
   "refresh": "15s",
   "schemaVersion": 39,
-  "version": 1,
+  "version": 2,
   "editable": false,
-  "time": { "from": "now-3h", "to": "now" },
+  "time": { "from": "now-12h", "to": "now" },
+  "annotations": {
+    "list": [
+      {
+        "name": "NWS alerts",
+        "datasource": { "type": "postgres", "uid": "skynyc-pg" },
+        "enable": true,
+        "hide": false,
+        "iconColor": "orange",
+        "target": {
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT effective_ts AS time, ends_ts AS timeend, airport || ': ' || event AS text, airport AS tags FROM weather_alerts WHERE effective_ts < $__timeTo() AND coalesce(ends_ts, now()) > $__timeFrom()"
+        },
+        "filter": { "exclude": false, "ids": [5, 7] }
+      }
+    ]
+  },
   "panels": [
     {
       "id": 1,
@@ -145,6 +162,172 @@
           }
         },
         "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "title": "Arrivals per 15 min",
+      "description": "Detected arrivals bucketed to 15 minutes per airport; NWS alert windows overlay as annotations. PRD §10 panel 2.",
+      "type": "timeseries",
+      "datasource": { "type": "postgres", "uid": "skynyc-pg" },
+      "gridPos": { "h": 8, "w": 15, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "time_series",
+          "rawSql": "SELECT $__timeGroup(event_ts, '15m') AS time, airport AS metric, count(*) AS arrivals FROM flight_events WHERE event_type = 'arrival' AND $__timeFilter(event_ts) GROUP BY 1, 2 ORDER BY 1"
+        }
+      ],
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 12,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 6,
+      "title": "Active alerts",
+      "description": "NWS alert state per airport over time; 'clear' between alert windows. Concurrent alerts show the latest-starting one. PRD §10 panel 5.",
+      "type": "state-timeline",
+      "datasource": { "type": "postgres", "uid": "skynyc-pg" },
+      "gridPos": { "h": 8, "w": 9, "x": 15, "y": 16 },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawSql": "SELECT ts AS time, airport, state FROM (SELECT effective_ts AS ts, airport, event AS state FROM weather_alerts UNION ALL SELECT ends_ts, airport, 'clear' FROM weather_alerts WHERE ends_ts IS NOT NULL) s WHERE ts < $__timeTo() ORDER BY 1"
+        }
+      ],
+      "transformations": [
+        { "id": "partitionByValues", "options": { "fields": ["airport"], "keepFields": false } }
+      ],
+      "options": {
+        "mergeValues": true,
+        "showValue": "auto",
+        "rowHeight": 0.85,
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": false },
+        "tooltip": { "mode": "single" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "fillOpacity": 70, "lineWidth": 0 },
+          "mappings": [
+            { "type": "value", "options": { "clear": { "color": "transparent", "index": 0 } } },
+            { "type": "special", "options": { "match": "null", "result": { "color": "transparent", "index": 1 } } }
+          ]
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 7,
+      "title": "Holding minutes + go-arounds",
+      "description": "Airborne delay across all three airports: holding minutes accumulated and go-arounds per 15 minutes; alert windows overlay. PRD §10 panel 4.",
+      "type": "timeseries",
+      "datasource": { "type": "postgres", "uid": "skynyc-pg" },
+      "gridPos": { "h": 8, "w": 15, "x": 0, "y": 24 },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "time_series",
+          "rawSql": "SELECT $__timeGroup(event_ts, '15m') AS time, 'holding minutes' AS metric, round(sum(duration_s) / 60.0, 1) AS value FROM flight_events WHERE event_type = 'holding' AND $__timeFilter(event_ts) GROUP BY 1 ORDER BY 1"
+        },
+        {
+          "refId": "B",
+          "format": "time_series",
+          "rawSql": "SELECT $__timeGroup(event_ts, '15m') AS time, 'go-arounds' AS metric, count(*) AS value FROM flight_events WHERE event_type = 'go_around' AND $__timeFilter(event_ts) GROUP BY 1 ORDER BY 1"
+        }
+      ],
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 60,
+            "lineWidth": 1,
+            "showPoints": "never"
+          },
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "go-arounds" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } },
+              { "id": "custom.drawStyle", "value": "points" },
+              { "id": "custom.showPoints", "value": "always" },
+              { "id": "custom.pointSize", "value": 6 }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 8,
+      "title": "Arrival rate vs visibility",
+      "description": "Each point is one airport-hour from fct_airport_hourly, colored by flight category — the live view of the business question. PRD §10 panel 6.",
+      "type": "xychart",
+      "datasource": { "type": "postgres", "uid": "skynyc-pg" },
+      "gridPos": { "h": 8, "w": 9, "x": 15, "y": 24 },
+      "timeFrom": "7d",
+      "targets": [
+        {
+          "refId": "VFR",
+          "format": "table",
+          "rawSql": "SELECT visibility_m, arrivals_detected FROM analytics.fct_airport_hourly WHERE flight_category = 'VFR' AND visibility_m IS NOT NULL AND $__timeFilter(hour_ts)"
+        },
+        {
+          "refId": "MVFR",
+          "format": "table",
+          "rawSql": "SELECT visibility_m, arrivals_detected FROM analytics.fct_airport_hourly WHERE flight_category = 'MVFR' AND visibility_m IS NOT NULL AND $__timeFilter(hour_ts)"
+        },
+        {
+          "refId": "IFR",
+          "format": "table",
+          "rawSql": "SELECT visibility_m, arrivals_detected FROM analytics.fct_airport_hourly WHERE flight_category = 'IFR' AND visibility_m IS NOT NULL AND $__timeFilter(hour_ts)"
+        },
+        {
+          "refId": "LIFR",
+          "format": "table",
+          "rawSql": "SELECT visibility_m, arrivals_detected FROM analytics.fct_airport_hourly WHERE flight_category = 'LIFR' AND visibility_m IS NOT NULL AND $__timeFilter(hour_ts)"
+        }
+      ],
+      "options": {
+        "mapping": "auto",
+        "series": [
+          { "x": { "matcher": { "id": "byName", "options": "visibility_m" } }, "y": { "matcher": { "id": "byName", "options": "arrivals_detected" } } }
+        ],
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "single" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "show": "points", "pointSize": { "fixed": 6 }, "fillOpacity": 60 },
+          "unit": "short"
+        },
+        "overrides": [
+          { "matcher": { "id": "byFrameRefID", "options": "VFR" },  "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } } ] },
+          { "matcher": { "id": "byFrameRefID", "options": "MVFR" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "blue" } } ] },
+          { "matcher": { "id": "byFrameRefID", "options": "IFR" },  "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } } ] },
+          { "matcher": { "id": "byFrameRefID", "options": "LIFR" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "dark-purple" } } ] }
+        ]
       }
     }
   ]
