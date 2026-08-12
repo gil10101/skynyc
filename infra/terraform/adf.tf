@@ -114,6 +114,12 @@ resource "azurerm_data_factory_pipeline" "land_bts" {
   # azurerm exposes string-typed pipeline parameters only, so the month list
   # travels as a JSON string and ForEach parses it with @json().
   parameters      = { ymList = "[]" }
+  # Datasets are referenced by name inside activities_json — invisible to
+  # Terraform's graph, so the edge must be explicit or creation races ADF.
+  depends_on = [
+    azurerm_data_factory_custom_dataset.http_bts,
+    azurerm_data_factory_custom_dataset.adls_binary,
+  ]
   activities_json = jsonencode([{
     name = "for_each_month"
     type = "ForEach"
@@ -132,6 +138,10 @@ resource "azurerm_data_factory_pipeline" "land_bts" {
 resource "azurerm_data_factory_pipeline" "land_bts_latest" {
   name            = "pl_land_bts_latest"
   data_factory_id = azurerm_data_factory.this.id
+  depends_on = [
+    azurerm_data_factory_custom_dataset.http_bts,
+    azurerm_data_factory_custom_dataset.adls_binary,
+  ]
   activities_json = jsonencode([{
     name   = "copy_latest_month"
     type   = "Copy"
@@ -160,6 +170,10 @@ resource "azurerm_data_factory_pipeline" "land_iem" {
   name            = "pl_land_iem"
   data_factory_id = azurerm_data_factory.this.id
   parameters      = { chunks = "[]" }
+  depends_on = [
+    azurerm_data_factory_custom_dataset.http_iem,
+    azurerm_data_factory_custom_dataset.adls_binary,
+  ]
   activities_json = jsonencode([{
     name = "for_each_chunk"
     type = "ForEach"
