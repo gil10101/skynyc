@@ -7,6 +7,14 @@ resource "databricks_service_principal" "dagster" {
   display_name = "dagster-orchestrator"
 }
 
+# run-now against the standing job needs no compute entitlement (the job owns
+# its cluster spec), but one-off runs/submit validation runs do.
+resource "databricks_entitlements" "dagster" {
+  service_principal_id = databricks_service_principal.dagster.id
+  workspace_access     = true
+  allow_cluster_create = true
+}
+
 resource "databricks_permissions" "medallion_run" {
   job_id = databricks_job.medallion.id
   access_control {
