@@ -311,9 +311,7 @@
       ],
       "options": {
         "mapping": "auto",
-        "series": [
-          { "x": { "matcher": { "id": "byName", "options": "visibility_m" } }, "y": { "matcher": { "id": "byName", "options": "arrivals_detected" } } }
-        ],
+        "series": [{}],
         "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
         "tooltip": { "mode": "single" }
       },
