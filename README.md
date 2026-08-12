@@ -25,13 +25,20 @@ is the point.
 
 ## The system, live
 
-![Live dashboard: aircraft over the NYC terminal area colored by altitude, current conditions per station, end-to-end pipeline freshness](assets/img/grafana-dashboard.png)
-*The provisioned dashboard: heading-rotated aircraft colored by altitude around the three fields, per-station conditions with flight category, and the end-to-end freshness stat that doubles as the pipeline's liveness alarm.*
+![Live dashboard: aircraft over the NYC terminal area, per-station conditions, pipeline freshness, 24 hours of detected arrivals with NWS alert overlays, and alert state per airport](assets/img/grafana-live-dashboard.png)
+*The provisioned dashboard over a full day: heading-rotated aircraft colored by altitude, per-station flight category, the freshness stat that doubles as the liveness alarm, detected arrivals per 15 minutes across all three airports — overnight lull and evening push visible — with NWS alert windows overlaid as region annotations, and the alert state timeline.*
 
 | | |
 |---|---|
 | ![Spark streaming query statistics: input rate, process rate, batch durations over hundreds of batches](assets/img/spark-live-query-stats.png) *The live query's statistics: rates, rows, and batch durations across hundreds of micro-batches* | ![Dagster run detail: ground-truth pull with per-airport arrival counts and credit accounting in the event log](assets/img/dagster-gt-run.png) *A ground-truth run: 1,592 arrivals pulled, per-airport counts and API-credit accounting in the log* |
 | ![Derived flight events queried live from Postgres](assets/img/events-live.png) *The product no feed provides: derived arrivals and holding patterns* | ![Azure ADLS Gen2 bronze archive listing](assets/img/azure-lake.png) *The lake: partitioned Parquet archive plus database backups* |
+
+![Dagster asset lineage: raw tables through staging views, the hour spine and hourly weather, to the facts and marts, every node materialized with green checks](assets/img/dagster-asset-lineage.png)
+*The analytical DAG, discovered from the dbt manifest: raw tables (dashed) through
+staging views, the airport-hour spine and last-known-value hourly weather, into
+`fct_airport_hourly`, event-time-enriched events, and the impact and quality marts —
+every node freshly materialized by the hourly schedule with its test counts green.
+The grain of every model is a one-sentence contract enforced by a uniqueness test.*
 
 ### The historical lakehouse
 
@@ -168,6 +175,22 @@ Kafka log** with adjusted values and re-scoring against ground truth — the
 scores land in `mart_detection_quality` (grain: day × airport), targets
 P ≥ 85% / R ≥ 80%.
 
+First live scores, from the first scored day (matching rule: same transponder,
+same airport, |Δt| ≤ 10 min against OpenSky's independent arrival records):
+
+| Airport | Precision | Recall |
+|---|---|---|
+| JFK | 94.4% | 98.3% |
+| LaGuardia | 93.3% | 94.1% |
+| Newark | 94.6% | 85.2% |
+
+Precision is measured against the full ground-truth day. Recall is measured
+over the window the detection stream was actually running — the stream started
+mid-day on the first scored day, and counting hours it never saw would report
+detector misses that are actually absence. Days without a landed ground-truth
+pull publish null scores, never zeros: an unscored day and a bad day must not
+look alike.
+
 Detectors are pure Python with no Spark dependency; the fixture suite runs the
 exact production logic over **recorded live sequences** (a full BA descent into
 JFK, a Delta flight vanishing at 83 m on LaGuardia final, overflights, taxi
@@ -181,9 +204,9 @@ yet.
 | M0 Foundations | Compose stack, schema, topics, live smoke test | Complete |
 | M1 Ingestion | Producers with credit guard + unit-aware parsing, weather consumer, parser suite over recorded fixtures | Complete |
 | M2 Live map | Spark bronze→Azure + live positions, provisioned dashboard | Complete |
-| M3 Detection & validation | Detectors + fixture suite, ground-truth pull, quality mart | Built and live; first precision/recall score lands with the first full detection day vs. the nightly-batch ground truth |
-| M4 Modeling | Full dbt DAG (hourly facts, weather join-at-read, impact mart), scheduled builds | — |
-| M5 Dashboard & soak | Remaining panels, alert overlays, 7-day continuous run | — |
+| M3 Detection & validation | Detectors + fixture suite, ground-truth pull, quality mart | Scored: precision 93-95% across all three airports, recall 85-98% over the detection window |
+| M4 Modeling | Full dbt DAG (hourly facts, weather join-at-read, impact mart), scheduled builds | Built and self-running: hourly build + source freshness on the Dagster daemon, daily quality report after the ground-truth pull |
+| M5 Dashboard & soak | Remaining panels, alert overlays, 7-day continuous run | Panels live with alert annotations; soak underway |
 | M6 Analysis & packaging | The written answer, demo capture | — |
 
 ## Running it
