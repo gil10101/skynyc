@@ -65,16 +65,22 @@ deduped = (
 # Maintenance is part of the pipeline, not a ceremony: gold's first operation
 # filters dest to the NYC three, so co-locating rows by dest lets its scan skip
 # most files. Runs after every rebuild because the rebuild replaces every file.
-before = spark.sql(f"DESCRIBE DETAIL delta.`{SILVER}`").select("numFiles").first()[0]
-spark.sql(f"OPTIMIZE delta.`{SILVER}` ZORDER BY (dest)")
-after = spark.sql(f"DESCRIBE DETAIL delta.`{SILVER}`").select("numFiles").first()[0]
+# Delta Python API, not SQL strings: `delta.`path`` SQL resolves through
+# spark_catalog, and legacy Hive-metastore access is disabled on UC-default
+# workspaces — the path API bypasses catalog resolution entirely.
+from delta.tables import DeltaTable  # noqa: E402 - needs the active session
+
+silver_table = DeltaTable.forPath(spark, SILVER)
+before = silver_table.detail().select("numFiles").first()[0]
+silver_table.optimize().executeZOrderBy("dest")
+after = silver_table.detail().select("numFiles").first()[0]
 
 # Retention: each monthly full-overwrite strands the entire previous version as
 # stale files, so unvacuumed storage doubles per cycle. 168h keeps roughly two
 # rebuilds reachable for time travel while bounding storage near 2x live size.
 # Never lower this below the 7-day default check; we deliberately leave
 # spark.databricks.delta.retentionDurationCheck.enabled at its safe default.
-spark.sql(f"VACUUM delta.`{SILVER}` RETAIN 168 HOURS")
+silver_table.vacuum(168)
 
 rows = spark.read.format("delta").load(SILVER).count()
 in_rows = bronze.count()

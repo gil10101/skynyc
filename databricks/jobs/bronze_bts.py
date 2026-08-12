@@ -77,9 +77,13 @@ for i, (ym, zpath) in enumerate(work, 1):
         .partitionBy("_ingest_ym")
         .save(BRONZE_TABLE)
     )
+    # Path API, not `DESCRIBE HISTORY delta.`...`` — that SQL form resolves
+    # through spark_catalog, which UC-default workspaces disable.
+    from delta.tables import DeltaTable
+
     written = (
-        spark.sql(f"DESCRIBE HISTORY delta.`{BRONZE_TABLE}` LIMIT 1")
-        .select("operationMetrics").first()[0]
+        DeltaTable.forPath(spark, BRONZE_TABLE)
+        .history(1).select("operationMetrics").first()[0]
     )
     n = int(written.get("numOutputRows", 0))
     total_rows += n
