@@ -56,7 +56,11 @@ ON CONFLICT (icao24, airport, est_arrival_ts) DO UPDATE SET
 """
 
 
-@asset(partitions_def=daily_partitions, group_name="ground_truth")
+# Asset key matches the table (and therefore the dbt source) it materializes:
+# dagster-dbt links stg_arrivals_gt to whatever asset owns the key
+# "arrivals_ground_truth" — a mismatched key would leave the pull and the
+# staging view as two disconnected nodes over the same table.
+@asset(key="arrivals_ground_truth", partitions_def=daily_partitions, group_name="ground_truth")
 def ground_truth_arrivals(context) -> None:  # noqa: ANN001 — unannotated per dagster's context rules
     """OpenSky /flights/arrival for one UTC day × three airports -> upsert.
 

@@ -5,7 +5,10 @@ models:
     description: >
       One row per UTC day per airport: detected vs ground-truth arrival counts
       and the resulting precision/recall (PRD §9; targets P >= 0.85, R >= 0.80).
-      The published quality score for the detection pipeline.
+      Precision publishes once the day's ground truth lands; recall publishes
+      only for days the detector observed >= 20 of 24 hours — a full-day
+      reference scored against a partial detection day reports absence as
+      misses. The published quality score for the detection pipeline.
     tests:
       - dbt_utils.unique_combination_of_columns:
           combination_of_columns: [quality_date, airport]
@@ -20,6 +23,8 @@ models:
       - name: arrivals_detected
         tests: [not_null]
       - name: arrivals_gt
+        tests: [not_null]
+      - name: observed_hours
         tests: [not_null]
   - name: fct_airport_hourly
     description: >

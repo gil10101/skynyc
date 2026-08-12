@@ -33,12 +33,14 @@ is the point.
 | ![Spark streaming query statistics: input rate, process rate, batch durations over hundreds of batches](assets/img/spark-live-query-stats.png) *The live query's statistics: rates, rows, and batch durations across hundreds of micro-batches* | ![Dagster run detail: ground-truth pull with per-airport arrival counts and credit accounting in the event log](assets/img/dagster-gt-run.png) *A ground-truth run: 1,592 arrivals pulled, per-airport counts and API-credit accounting in the log* |
 | ![Derived flight events queried live from Postgres](assets/img/events-live.png) *The product no feed provides: derived arrivals and holding patterns* | ![Azure ADLS Gen2 bronze archive listing](assets/img/azure-lake.png) *The lake: partitioned Parquet archive plus database backups* |
 
-![Dagster asset lineage: raw tables through staging views, the hour spine and hourly weather, to the facts and marts, every node materialized with green checks](assets/img/dagster-asset-lineage.png)
-*The analytical DAG, discovered from the dbt manifest: raw tables (dashed) through
-staging views, the airport-hour spine and last-known-value hourly weather, into
-`fct_airport_hourly`, event-time-enriched events, and the impact and quality marts —
-every node freshly materialized by the hourly schedule with its test counts green.
-The grain of every model is a one-sentence contract enforced by a uniqueness test.*
+![Dagster global asset lineage with the quality mart selected: raw tables through staging views, spine and hourly weather, facts and marts, plus the asset's raw SQL, data versions, and per-input event pointers in the detail pane](assets/img/dagster-global-asset-lineage.png)
+*The analytical DAG, discovered from the dbt manifest: raw tables (dashed, fed by
+the stream outside Dagster) through staging views, the airport-hour spine and
+last-known-value hourly weather, into `fct_airport_hourly`, event-time-enriched
+events, and the impact and quality marts — every node freshly materialized by the
+hourly schedule with its test counts green. The detail pane carries the model's
+raw SQL and per-input data versions. The grain of every model is a one-sentence
+contract enforced by a uniqueness test.*
 
 ### The historical lakehouse
 
@@ -65,6 +67,12 @@ jobs write governed paths, not catalog tables.*
 |---|---|
 | ![Bronze ingestion driver log: per-month row counts across 344 archives](assets/img/databricks-bronze-ingest.png) *Bronze's receipt: every month logged with row counts, 181,076,399 rows across the span* | ![Spark UI mid-silver: 200-task stage, 6.2 GiB shuffle read](assets/img/databricks-spark-ui.png) *Silver's dedupe is the genuinely distributed workload: a 200-task Delta write over 6.2 GiB of shuffle* |
 | ![SQL editor: arrival delay by flight category over 38 years, sub-second on serverless](assets/img/databricks-sql-thesis.png) *The thesis in one query, 0.8s on the serverless warehouse: average arrival delay runs 8-14x higher on LIFR days than VFR days at all three airports* | ![Unity Catalog: external Delta tables over the lake with full schema](assets/img/databricks-catalog.png) *The governed window: external tables over the same Delta paths the jobs write — the warehouse's only route to the lake* |
+
+![Analytics dashboard: arrival delay staircase by flight category per airport, weather vs NAS delay by year, 38-year cancellation seasonality, and the worst weather days on record](assets/img/skynyc-analytics.png)
+*The same gold, served: delay climbing VFR to LIFR at every airport, two decades
+of cause-attributed delay with the 2006-07 peak and the COVID collapse, winter
+and convective-summer cancellation seasonality, and a worst-days table that reads
+as a storm almanac — Sandy, the 2018 blizzards, February 2026.*
 
 ---
 
@@ -184,12 +192,14 @@ same airport, |Δt| ≤ 10 min against OpenSky's independent arrival records):
 | LaGuardia | 93.3% | 94.1% |
 | Newark | 94.6% | 85.2% |
 
-Precision is measured against the full ground-truth day. Recall is measured
-over the window the detection stream was actually running — the stream started
-mid-day on the first scored day, and counting hours it never saw would report
-detector misses that are actually absence. Days without a landed ground-truth
-pull publish null scores, never zeros: an unscored day and a bad day must not
-look alike.
+Precision is measured against the full ground-truth day. The recall figures
+above were measured over the window the detection stream was actually running —
+it started mid-day on the first scored day, and counting hours it never saw
+would report detector misses that are actually absence. The mart enforces both
+rules structurally: precision publishes only once the day's ground truth has
+landed, and recall publishes only for days the detector observed at least 20
+of 24 hours (`observed_hours` is a column, so the gate is auditable). An
+unscored day and a bad day must never look alike.
 
 Detectors are pure Python with no Spark dependency; the fixture suite runs the
 exact production logic over **recorded live sequences** (a full BA descent into
