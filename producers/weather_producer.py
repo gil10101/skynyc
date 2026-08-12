@@ -116,8 +116,13 @@ def poll_alerts(airport: str, producer: Producer,
         alert_id = feature.get("id") or properties.get("id")
         if not alert_id:
             continue
+        # ends is the hazard end and is NULLABLE; expires is the message
+        # lifecycle end and always present (NWS API spec). An alert stored
+        # with a null end would read as active forever downstream, so fall
+        # back to expires. The raw payload keeps both originals.
+        ends_ts = properties.get("ends") or properties.get("expires")
         signature = (properties.get("event"), properties.get("severity"),
-                     properties.get("effective"), properties.get("ends"))
+                     properties.get("effective"), ends_ts)
         if seen.get((alert_id, airport)) == signature:
             continue  # unchanged — the topic carries changes, not heartbeats
         message = WeatherAlertMessage(
@@ -126,7 +131,7 @@ def poll_alerts(airport: str, producer: Producer,
             event=properties.get("event"),
             severity=properties.get("severity"),
             effective_ts=properties.get("effective"),
-            ends_ts=properties.get("ends"),
+            ends_ts=ends_ts,
             raw=properties,
         )
         producer.produce(ALERTS_TOPIC, key=airport, value=message.model_dump_json())
