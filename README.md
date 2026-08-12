@@ -26,7 +26,7 @@ is the point.
 ## The system, live
 
 ![Live dashboard: aircraft over the NYC terminal area, per-station conditions, pipeline freshness, 24 hours of detected arrivals with NWS alert overlays, and alert state per airport](assets/img/grafana-live-dashboard.png)
-*The provisioned dashboard over a full day: heading-rotated aircraft colored by altitude, per-station flight category, the freshness stat that doubles as the liveness alarm, detected arrivals per 15 minutes across all three airports — overnight lull and evening push visible — with NWS alert windows overlaid as region annotations, and the alert state timeline.*
+*The provisioned dashboard over a full day: heading-rotated aircraft colored by altitude, per-station flight category, the freshness stat doubling as the liveness alarm, detected arrivals per 15 minutes across all three airports — overnight lull and evening push visible — with NWS alert windows overlaid as region annotations, and the alert state timeline.*
 
 | | |
 |---|---|
@@ -54,22 +54,21 @@ schemes) — the gap is landed around, documented, and self-heals if the source 
 Deliberately single-node compute: bronze is per-archive by construction (ZIPs are not
 splittable), and the subscription's SKU allow-list and 4-vCPU family quota cap the cluster
 at one machine — worker count is a single Terraform variable when the ceiling lifts. The
-whole build ran on roughly ten dollars of a $200 credit grant, with the budget alert never
-firing.
+build consumed about $10 of a $200 credit grant.
 
 ![Databricks multi-task run: bronze, silver, gold all green with durations](assets/img/databricks-run-dag.png)
-*The medallion build, end to end: 344 monthly archives to bronze in 2h58m, the 181M-row
+*The medallion build: 344 monthly archives to bronze in 2h58m, the 181M-row
 typed dedupe in 31m, weather parse and gold marts in minutes. Databricks labels Jobs-API
 runs "Manually" — the caller is the Dagster asset; lineage is blank by design because the
 jobs write governed paths, not catalog tables.*
 
 | | |
 |---|---|
-| ![Bronze ingestion driver log: per-month row counts across 344 archives](assets/img/databricks-bronze-ingest.png) *Bronze's receipt: every month logged with row counts, 181,076,399 rows across the span* | ![Spark UI mid-silver: 200-task stage, 6.2 GiB shuffle read](assets/img/databricks-spark-ui.png) *Silver's dedupe is the genuinely distributed workload: a 200-task Delta write over 6.2 GiB of shuffle* |
+| ![Bronze ingestion driver log: per-month row counts across 344 archives](assets/img/databricks-bronze-ingest.png) *Bronze's receipt: every month logged with row counts, 181,076,399 rows across the span* | ![Spark UI mid-silver: 200-task stage, 6.2 GiB shuffle read](assets/img/databricks-spark-ui.png) *Silver's dedupe is the distributed workload: a 200-task Delta write over 6.2 GiB of shuffle* |
 | ![SQL editor: arrival delay by flight category over 38 years, sub-second on serverless](assets/img/databricks-sql-thesis.png) *The thesis in one query, 0.8s on the serverless warehouse: average arrival delay runs 8-14x higher on LIFR days than VFR days at all three airports* | ![Unity Catalog: external Delta tables over the lake with full schema](assets/img/databricks-catalog.png) *The governed window: external tables over the same Delta paths the jobs write — the warehouse's only route to the lake* |
 
 ![Analytics dashboard: arrival delay staircase by flight category per airport, weather vs NAS delay by year, 38-year cancellation seasonality, and the worst weather days on record](assets/img/skynyc-analytics.png)
-*The same gold, served: delay climbing VFR to LIFR at every airport, two decades
+*Delay climbing VFR to LIFR at every airport, two decades
 of cause-attributed delay with the 2006-07 peak and the COVID collapse, winter
 and convective-summer cancellation seasonality, and a worst-days table that reads
 as a storm almanac — Sandy, the 2018 blizzards, February 2026.*
@@ -95,13 +94,13 @@ as a storm almanac — Sandy, the 2018 blizzards, February 2026.*
                               (detection quality: precision / recall per day per airport)
 ```
 
-| Component | Role | Honest scoping note |
+| Component | Role | Scoping |
 |---|---|---|
 | Python producers ×2 | Poll REST APIs, wrap in a typed envelope, publish to Kafka; own the OAuth2 token lifecycle and the API credit budget | Polling→Kafka is the standard bridge for poll-only sources |
 | Kafka (single node, KRaft) | Durable buffer and 7-day replay log | Not here for throughput (~5 msg/s) — here because the upstream API serves at most 1 h of history, so the retained log is the only replay substrate detector tuning has |
 | Spark Structured Streaming | Bronze archive, live-position upserts, and stateful per-aircraft event detection (`applyInPandasWithState`) | Single-node `local[*]` by design; the code is cluster-portable |
 | Plain Python consumer | Weather topics → Postgres upserts | 3 messages per 5 minutes does not need distributed compute |
-| Azure ADLS Gen2 | The lake: immutable bronze archive + nightly backups | Compute is disposable, storage is not — the one place a hyperscaler earns its keep here |
+| Azure ADLS Gen2 | The lake: immutable bronze archive + nightly backups | Durability the droplet cannot provide; compute is disposable, storage is not |
 | DigitalOcean droplet | The compute host: all nine containers, 24/7 | Flat always-on workload; burst-priced clouds would charge a premium for a profile this steady |
 | Postgres 16 | Serving layer and warehouse | |
 | dbt | Staging → marts; tests and source freshness double as pipeline monitoring | |
@@ -138,15 +137,13 @@ public access disabled, TLS 1.2 floor): the bronze Parquet archive Spark writes
 via `abfss://`, and the nightly `pg_dump` the batch layer uploads. A lifecycle
 rule tiers archive blobs to Cool at 30 days. This is the system of record —
 the upstream API serves at most one hour of history, so if the archive is lost,
-it is lost. Provisioned by `scripts/provision_azure.sh`; the storage cost
-rounds to pennies.
+it is lost. Provisioned by `scripts/provision_azure.sh`.
 
 Why this pairing instead of one cloud for both: an 8 GB droplet is a fraction
 of the price of the equivalent on-demand EC2 instance, and this workload has
-no burst profile that would reward per-second billing — it is a flat 24/7 hum.
-Object storage is the piece where a hyperscaler genuinely earns its keep
-(durability SLAs a single droplet cannot approach), so the lake goes there and
-nothing else does. Managed Kafka and cloud warehouses stay out: at 5 msg/s and
+no burst profile that would reward per-second billing.
+Object storage is the piece where a hyperscaler earns its place — durability a
+single droplet cannot approach — so the lake goes there and nothing else does. Managed Kafka and cloud warehouses stay out: at 5 msg/s and
 a few thousand events a day they would be cost without engineering content.
 
 **Security posture:** every published container port binds `127.0.0.1` — not
@@ -201,7 +198,7 @@ landed, and recall publishes only for days the detector observed at least 20
 of 24 hours (`observed_hours` is a column, so the gate is auditable). An
 unscored day and a bad day must never look alike.
 
-Detectors are pure Python with no Spark dependency; the fixture suite runs the
+Detectors have no Spark dependency; the fixture suite runs the
 exact production logic over **recorded live sequences** (a full BA descent into
 JFK, a Delta flight vanishing at 83 m on LaGuardia final, overflights, taxi
 traffic) plus disclosed synthetic geometry for patterns weather hasn't provided
@@ -271,18 +268,16 @@ Azure lake provisioning: `scripts/provision_azure.sh`.
   alerts; US-government open data. Requests carry the required identifying
   `User-Agent`.
 
-Total infrastructure cost: one small VPS (~$24–48/mo for the project's
-lifetime) and object storage that rounds to pennies. Every other component is
-open source; both data sources are free.
+Infrastructure cost: one small VPS (~$24–48/mo) plus minimal object storage.
 
 ## Repository layout
 
 ```
 producers/       OpenSky + NWS pollers, shared token/backoff/parsing/models
 consumers/       weather → Postgres upserts
-streaming/       Spark app (bronze / live / events) + pure-python detectors + sinks
+streaming/       Spark app (bronze / live / events) + detectors + sinks
 orchestration/   Dagster: daily ground-truth asset, schedules
-dbt/skynyc_dbt/  staging + marts (detection quality now; impact marts in M4)
+dbt/skynyc_dbt/  staging, spine + hourly-weather intermediates, fact and impact/quality marts
 db/init/         first-boot schema + numbered migrations
 grafana/         provisioned datasource + dashboard (the repo is the dashboard)
 scripts/         smoke test, fixture capture, Azure provisioning, VPS deploy
