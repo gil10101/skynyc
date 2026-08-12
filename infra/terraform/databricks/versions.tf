@@ -33,6 +33,7 @@ data "azurerm_databricks_workspace" "this" {
 }
 
 provider "databricks" {
-  host      = "https://${data.azurerm_databricks_workspace.this.workspace_url}"
+  # workspace_url arrives scheme-prefixed in azurerm 4.x; normalize either way.
+  host      = "https://${trimprefix(data.azurerm_databricks_workspace.this.workspace_url, "https://")}"
   auth_type = "azure-cli"
 }
