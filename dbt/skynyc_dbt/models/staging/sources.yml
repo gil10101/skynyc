@@ -34,3 +34,28 @@ sources:
         description: >
           NWS alerts fanned out per airport. No freshness check: a long stretch
           with no active alert is normal weather, not a dead producer.
+      - name: gold_airport_day_delay
+        description: >
+          Historical mart upserted from the lakehouse gold export (PRD §5.3):
+          one row per airport per day, Oct 1987 onward. Tested here because the
+          batch path that builds it moves six orders of magnitude more rows
+          than the live path and deserves the same contract.
+        tests:
+          - dbt_utils.unique_combination_of_columns:
+              combination_of_columns: [flight_date, airport]
+          - dbt_utils.expression_is_true:
+              expression: "arrivals_scheduled >= 0 and cancelled >= 0 and cancelled_weather >= 0"
+          - dbt_utils.expression_is_true:
+              expression: "cancelled_weather <= cancelled"
+        columns:
+          - name: flight_date
+            tests: [not_null]
+          - name: airport
+            tests:
+              - not_null
+              - accepted_values:
+                  values: ["JFK", "LGA", "EWR"]
+          - name: worst_category
+            tests:
+              - accepted_values:
+                  values: ["VFR", "MVFR", "IFR", "LIFR"]

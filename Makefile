@@ -1,5 +1,5 @@
-# SkyNYC — M0+M1 targets. Remaining targets from PRD §11
-# (stream, batch, dbt-build, demo) arrive with M2-M5.
+# SkyNYC — operational interface for the whole stack: infrastructure, ingestion,
+# streaming, batch, dbt, and the lakehouse targets (PRD §11).
 SHELL := /bin/bash
 COMPOSE := docker compose
 KAFKA_BIN := /opt/kafka/bin
@@ -9,7 +9,7 @@ PG_USER ?= skynyc
 PG_DB ?= skynyc
 
 .DEFAULT_GOAL := help
-.PHONY: help up down logs ps topics smoke psql ingest lag credits test stream batch dbt-build backup backup
+.PHONY: help up down logs ps topics smoke psql ingest lag credits test stream batch dbt-build backup lake-backfill
 
 help:
 	@echo "SkyNYC targets:"
@@ -107,7 +107,7 @@ backup:
 # the freshest published month (~2-month reporting lag) and hands both ADF
 # pipelines their parameters. Idempotent: re-landing overwrites the same paths.
 lake-backfill:
-	python3 scripts/gen_backfill_params.py $$(date -v-3m +%Y) $$(date -v-3m +%-m) /tmp/skynyc-backfill
+	python3 scripts/gen_backfill_params.py $$(date -d '3 months ago' +%Y 2>/dev/null || date -v-3m +%Y) $$(date -d '3 months ago' +%-m 2>/dev/null || date -v-3m +%-m) /tmp/skynyc-backfill
 	az datafactory pipeline create-run -g skynyc-rg --factory-name skynyc-adf \
 	  --name pl_land_bts --parameters @/tmp/skynyc-backfill/bts_backfill.json
 	az datafactory pipeline create-run -g skynyc-rg --factory-name skynyc-adf \

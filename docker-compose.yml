@@ -1,6 +1,6 @@
-# SkyNYC — M0 infrastructure (kafka, postgres, grafana) + M1 ingestion
-# (producer-opensky, producer-weather, consumer-weather) + M2 processing (spark).
-# Remaining services from PRD §11 (dagster-webserver, dagster-daemon) land in M3-M4.
+# SkyNYC — the full stack: infrastructure (kafka, postgres, grafana), ingestion
+# (producer-opensky, producer-weather, consumer-weather), processing (spark),
+# and batch orchestration (dagster-webserver, dagster-daemon) per PRD §11.
 # All long-running services use restart: unless-stopped — Docker supervises the
 # streams, Dagster supervises batch (Manual 02).
 
@@ -190,10 +190,12 @@ services:
       - "127.0.0.1:3000:3000"
     environment:
       GF_SECURITY_ADMIN_USER: admin
-      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
       GF_USERS_DEFAULT_THEME: dark
       # Read by the provisioned datasource yaml ($POSTGRES_PASSWORD interpolation).
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-skynyc}
+      # Read by the provisioned alerting yaml ($NTFY_TOPIC interpolation).
+      NTFY_TOPIC: ${NTFY_TOPIC:-skynyc-unconfigured}
       TZ: UTC
     volumes:
       - grafana-data:/var/lib/grafana

@@ -384,9 +384,12 @@ def detection_quality_report(context) -> None:  # noqa: ANN001 — unannotated p
             select quality_date, airport, arrivals_detected, arrivals_gt,
                    "precision", recall
             from analytics.mart_detection_quality
-            where "precision" is not null
-            order by quality_date desc, airport
-            limit 3
+            where quality_date = (
+                select max(quality_date) from analytics.mart_detection_quality
+                where "precision" is not null
+            )
+              and "precision" is not null
+            order by airport
             """
         ).fetchall()
     if not rows:

@@ -44,12 +44,13 @@ contract enforced by a uniqueness test.*
 
 ### The historical lakehouse
 
-38 years of BTS on-time performance (181M rows after dedupe) and 4.3M METAR observations,
+38 years of BTS on-time performance (181M rows, silver-deduplicated) and 4.3M METAR observations,
 landed by Data Factory and built into a bronze/silver/gold Delta medallion by a Databricks
 job that Dagster triggers over the Jobs API. Postgres stays the only serving store; a
 serverless SQL warehouse over Unity Catalog external tables is the analyst's window into
 the history. BTS serves no PREZIP files for 1990-1999 (verified against both naming
-schemes) — the gap is landed around, documented, and self-heals if the source restores it.
+schemes) — the landing pipeline retries every month each run, so the decade stays absent
+until the source restores it, then lands without a code change.
 
 Deliberately single-node compute: bronze is per-archive by construction (ZIPs are not
 splittable), and the subscription's SKU allow-list and 4-vCPU family quota cap the cluster
@@ -70,8 +71,8 @@ jobs write governed paths, not catalog tables.*
 ![Analytics dashboard: arrival delay staircase by flight category per airport, weather vs NAS delay by year, 38-year cancellation seasonality, and the worst weather days on record](assets/img/skynyc-analytics.png)
 *Delay climbing VFR to LIFR at every airport, two decades
 of cause-attributed delay with the 2006-07 peak and the COVID collapse, winter
-and convective-summer cancellation seasonality, and a worst-days table that reads
-as a storm almanac — Sandy, the 2018 blizzards, February 2026.*
+and convective-summer cancellation seasonality, and the worst days on
+record — Sandy, the 2018 blizzards, February 2026.*
 
 ---
 
@@ -242,9 +243,10 @@ Azure lake provisioning: `scripts/provision_azure.sh`.
 - **Kafka at 5 msg/s** — replay is the feature. The API keeps one hour of
   history; the retained log is the only thing that makes threshold tuning
   possible at all.
-- **Join-at-read, not stream-stream** — weather changes a few times an hour;
-  events are enriched at query time with the observation valid at event time.
-  A stream-stream join here would be architecture theater.
+- **Join-at-read, not stream-stream** — weather is three slowly-changing
+  station records; events are enriched at query time with the observation
+  valid at event time. A stream-stream join would add operational surface
+  and no correctness.
 - **Docker supervises streams, Dagster supervises batch** — infinite processes
   are not jobs.
 - **Units are load-bearing** — every NWS quantity is converted by reading its
