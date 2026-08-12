@@ -68,7 +68,8 @@ for i, (ym, zpath) in enumerate(work, 1):
         .option("escape", '"').csv(f"file:{local_csv}")
         .withColumn("_ingest_ym", F.lit(ym))
     )
-    n = df.count()
+    # No pre-write count: it costs a second full parse of every CSV just for a
+    # log line. Row counts come from the Delta commit's own metrics instead.
     (
         df.write.format("delta").mode("overwrite")
         .option("replaceWhere", f"_ingest_ym = '{ym}'")
@@ -76,6 +77,11 @@ for i, (ym, zpath) in enumerate(work, 1):
         .partitionBy("_ingest_ym")
         .save(BRONZE_TABLE)
     )
+    written = (
+        spark.sql(f"DESCRIBE HISTORY delta.`{BRONZE_TABLE}` LIMIT 1")
+        .select("operationMetrics").first()[0]
+    )
+    n = int(written.get("numOutputRows", 0))
     total_rows += n
     os.remove(local_zip)
     os.remove(local_csv)
