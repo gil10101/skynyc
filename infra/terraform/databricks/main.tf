@@ -63,16 +63,20 @@ resource "databricks_job" "medallion" {
     timeout_seconds = 21600
   }
 
+  # Task blocks are compared positionally against the API, which returns them
+  # sorted by task_key — keep these alphabetical or every plan shows a phantom
+  # in-place update.
   task {
-    task_key        = "silver_ontime"
+    task_key        = "gold_marts"
     job_cluster_key = "single_node"
-    depends_on { task_key = "bronze_bts" }
+    depends_on { task_key = "silver_metar" }
+    depends_on { task_key = "silver_ontime" }
     spark_python_task {
-      python_file = databricks_workspace_file.jobs["silver_ontime.py"].path
+      python_file = databricks_workspace_file.jobs["gold_marts.py"].path
       source      = "WORKSPACE"
       parameters  = [local.lake_base]
     }
-    timeout_seconds = 14400
+    timeout_seconds = 7200
   }
 
   task {
@@ -88,16 +92,15 @@ resource "databricks_job" "medallion" {
   }
 
   task {
-    task_key        = "gold_marts"
+    task_key        = "silver_ontime"
     job_cluster_key = "single_node"
-    depends_on { task_key = "silver_ontime" }
-    depends_on { task_key = "silver_metar" }
+    depends_on { task_key = "bronze_bts" }
     spark_python_task {
-      python_file = databricks_workspace_file.jobs["gold_marts.py"].path
+      python_file = databricks_workspace_file.jobs["silver_ontime.py"].path
       source      = "WORKSPACE"
       parameters  = [local.lake_base]
     }
-    timeout_seconds = 7200
+    timeout_seconds = 14400
   }
 }
 
