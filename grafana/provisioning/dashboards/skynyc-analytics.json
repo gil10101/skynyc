@@ -1,0 +1,245 @@
+{
+  "uid": "skynyc-analytics",
+  "title": "SkyNYC Analytics",
+  "timezone": "utc",
+  "refresh": "",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": false,
+  "time": { "from": "now-30d", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Average arrival delay by flight category, 1987-present",
+      "description": "The thesis in one chart: every airport-day since October 1987 bucketed by its worst observed flight category. Delay climbs monotonically as conditions degrade at all three airports.",
+      "type": "barchart",
+      "datasource": { "type": "postgres", "uid": "skynyc-pg" },
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawSql": "SELECT worst_category, round(avg(avg_arr_delay_min) FILTER (WHERE airport = 'JFK')::numeric, 1) AS \"JFK\", round(avg(avg_arr_delay_min) FILTER (WHERE airport = 'LGA')::numeric, 1) AS \"LGA\", round(avg(avg_arr_delay_min) FILTER (WHERE airport = 'EWR')::numeric, 1) AS \"EWR\" FROM gold_airport_day_delay WHERE worst_category IS NOT NULL GROUP BY worst_category ORDER BY array_position(ARRAY['VFR', 'MVFR', 'IFR', 'LIFR'], worst_category)"
+        }
+      ],
+      "options": {
+        "orientation": "auto",
+        "xTickLabelRotation": 0,
+        "showValue": "always",
+        "groupWidth": 0.72,
+        "barWidth": 0.9,
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "m",
+          "min": 0,
+          "custom": { "fillOpacity": 85, "lineWidth": 0 }
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "JFK" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "semi-dark-yellow" } } ] },
+          { "matcher": { "id": "byName", "options": "LGA" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "semi-dark-blue" } } ] },
+          { "matcher": { "id": "byName", "options": "EWR" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "semi-dark-green" } } ] }
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "title": "Weather vs NAS delay, thousand hours per year",
+      "description": "Cause-attributed delay since BTS began publishing causes in June 2003. Weather and National Airspace System delay move together — NAS delay is substantially weather downstream of the terminal.",
+      "type": "timeseries",
+      "datasource": { "type": "postgres", "uid": "skynyc-pg" },
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 0 },
+      "timeFrom": "40y",
+      "targets": [
+        {
+          "refId": "A",
+          "format": "time_series",
+          "rawSql": "SELECT date_trunc('year', flight_date) AS time, round((sum(weather_delay_min_total) / 60000.0)::numeric, 1) AS \"weather\", round((sum(nas_delay_min_total) / 60000.0)::numeric, 1) AS \"NAS\" FROM gold_airport_day_delay WHERE flight_date >= '2003-06-01' AND flight_date < date_trunc('year', now()) GROUP BY 1 ORDER BY 1"
+        }
+      ],
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 18,
+            "showPoints": "auto",
+            "pointSize": 5
+          }
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "weather" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "semi-dark-red" } } ] },
+          { "matcher": { "id": "byName", "options": "NAS" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "semi-dark-orange" } } ] }
+        ]
+      }
+    },
+    {
+      "id": 3,
+      "title": "Weather cancellations by month, 38-year totals",
+      "description": "Seasonality: winter dominates outright cancellations; the late-summer bump is convective. Denominator is roughly constant per month across the span.",
+      "type": "barchart",
+      "datasource": { "type": "postgres", "uid": "skynyc-pg" },
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 9 },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawSql": "SELECT to_char(to_date(extract(month from flight_date)::text, 'MM'), 'Mon') AS month, sum(cancelled_weather) FILTER (WHERE airport = 'JFK') AS \"JFK\", sum(cancelled_weather) FILTER (WHERE airport = 'LGA') AS \"LGA\", sum(cancelled_weather) FILTER (WHERE airport = 'EWR') AS \"EWR\" FROM gold_airport_day_delay GROUP BY extract(month from flight_date) ORDER BY extract(month from flight_date)"
+        }
+      ],
+      "options": {
+        "orientation": "auto",
+        "xTickLabelRotation": 0,
+        "showValue": "never",
+        "stacking": "normal",
+        "groupWidth": 0.8,
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "custom": { "fillOpacity": 85, "lineWidth": 0, "stacking": { "mode": "normal" } }
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "JFK" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "semi-dark-yellow" } } ] },
+          { "matcher": { "id": "byName", "options": "LGA" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "semi-dark-blue" } } ] },
+          { "matcher": { "id": "byName", "options": "EWR" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "semi-dark-green" } } ] }
+        ]
+      }
+    },
+    {
+      "id": 4,
+      "title": "Worst weather days on record",
+      "description": "Airport-days ranked by weather cancellations. The list reads as a storm almanac: blizzards, Sandy, the January 2016 shutdown.",
+      "type": "table",
+      "datasource": { "type": "postgres", "uid": "skynyc-pg" },
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 9 },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawSql": "SELECT flight_date AS \"date\", airport, worst_category AS category, arrivals_scheduled AS scheduled, cancelled, cancelled_weather AS \"wx cancelled\", round((weather_delay_min_total / 60.0)::numeric, 1) AS \"wx delay hours\" FROM gold_airport_day_delay ORDER BY cancelled_weather DESC LIMIT 12"
+        }
+      ],
+      "options": { "showHeader": true, "footer": { "show": false } },
+      "fieldConfig": {
+        "defaults": { "custom": { "align": "auto" } },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "category" },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  { "type": "value", "options": {
+                    "VFR":  { "color": "semi-dark-green",       "index": 0 },
+                    "MVFR": { "color": "semi-dark-blue",        "index": 1 },
+                    "IFR":  { "color": "semi-dark-red",         "index": 2 },
+                    "LIFR": { "color": "semi-dark-purple", "index": 3 }
+                  } }
+                ]
+              },
+              { "id": "custom.cellOptions", "value": { "type": "color-background" } }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 5,
+      "title": "Detector precision and recall by day",
+      "description": "The validation loop, published daily: detected arrivals matched against OpenSky ground truth per airport (same aircraft, same airport, within 10 minutes). Reference lines at the P 0.85 / R 0.80 targets.",
+      "type": "timeseries",
+      "datasource": { "type": "postgres", "uid": "skynyc-pg" },
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 18 },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "time_series",
+          "rawSql": "SELECT quality_date::timestamptz AS time, airport || ' precision' AS metric, \"precision\" AS value FROM analytics.mart_detection_quality WHERE \"precision\" IS NOT NULL ORDER BY 1"
+        },
+        {
+          "refId": "B",
+          "format": "time_series",
+          "rawSql": "SELECT quality_date::timestamptz AS time, airport || ' recall' AS metric, recall AS value FROM analytics.mart_detection_quality WHERE \"precision\" IS NOT NULL ORDER BY 1"
+        }
+      ],
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "showPoints": "always",
+            "pointSize": 6,
+            "spanNulls": true,
+            "thresholdsStyle": { "mode": "line" }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "transparent", "value": null },
+              { "color": "semi-dark-red", "value": 0.8 },
+              { "color": "semi-dark-orange", "value": 0.85 }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 6,
+      "title": "Live-window impact mart",
+      "description": "mart_weather_impact as it stands right now: per-hour rates by airport, flight category, and wind bucket from the streaming window. The historical panels above are its 38-year echo.",
+      "type": "table",
+      "datasource": { "type": "postgres", "uid": "skynyc-pg" },
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 18 },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawSql": "SELECT airport, flight_category AS category, wind_bucket AS wind, airport_hours AS hours, arrivals, arrivals_per_hour AS \"arrivals/hr\", holding_min_per_hour AS \"holding min/hr\", go_arounds, go_around_rate_pct AS \"go-around %\" FROM analytics.mart_weather_impact ORDER BY airport, array_position(ARRAY['VFR', 'MVFR', 'IFR', 'LIFR'], flight_category), array_position(ARRAY['calm', 'breezy', 'windy', 'unknown'], wind_bucket)"
+        }
+      ],
+      "options": { "showHeader": true, "footer": { "show": false } },
+      "fieldConfig": {
+        "defaults": { "custom": { "align": "auto" } },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "category" },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  { "type": "value", "options": {
+                    "VFR":  { "color": "semi-dark-green",       "index": 0 },
+                    "MVFR": { "color": "semi-dark-blue",        "index": 1 },
+                    "IFR":  { "color": "semi-dark-red",         "index": 2 },
+                    "LIFR": { "color": "semi-dark-purple", "index": 3 }
+                  } }
+                ]
+              },
+              { "id": "custom.cellOptions", "value": { "type": "color-background" } }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
