@@ -16,7 +16,7 @@ SELECT
   round(avg(p90_arr_delay_min), 1)           AS avg_p90_delay_min,
   round(avg(arrivals_delayed_15 / nullif(arrivals_scheduled, 0)) * 100, 1)
                                              AS pct_arrivals_late15
-FROM lake.gold_airport_day_delay
+FROM skynyc.lake.gold_airport_day_delay
 WHERE worst_category IS NOT NULL
 GROUP BY airport, worst_category
 ORDER BY airport, array_position(array('VFR','MVFR','IFR','LIFR'), worst_category);
@@ -27,7 +27,7 @@ SELECT
   flight_date, airport, worst_category,
   arrivals_scheduled, cancelled, cancelled_weather,
   round(weather_delay_min_total / 60, 1) AS weather_delay_hours
-FROM lake.gold_airport_day_delay
+FROM skynyc.lake.gold_airport_day_delay
 QUALIFY row_number() OVER (PARTITION BY airport ORDER BY cancelled_weather DESC) <= 10
 ORDER BY cancelled_weather DESC;
 
@@ -40,7 +40,7 @@ SELECT
   round(sum(weather_delay_min_total)
         / nullif(sum(weather_delay_min_total) + sum(nas_delay_min_total), 0) * 100, 1)
                                                                     AS weather_pct_of_wx_nas
-FROM lake.gold_airport_day_delay
+FROM skynyc.lake.gold_airport_day_delay
 WHERE flight_date >= '2003-06-01'
 GROUP BY 1 ORDER BY 1;
 
@@ -50,17 +50,17 @@ SELECT
   airport,
   sum(cancelled_weather)            AS wx_cancels,
   round(avg(pct_obs_ifr_or_worse) * 100, 1) AS pct_obs_ifr_plus
-FROM lake.gold_airport_day_delay
+FROM skynyc.lake.gold_airport_day_delay
 GROUP BY 1, 2 ORDER BY 1, 2;
 
 -- 5. Volume receipt: what the lakehouse actually holds, by layer grain.
 SELECT 'silver_ontime' AS tbl, count(*) AS rows, min(flight_date) AS from_date,
        max(flight_date) AS to_date, count(DISTINCT dest) AS airports
-FROM lake.silver_ontime
+FROM skynyc.lake.silver_ontime
 UNION ALL
 SELECT 'gold_airport_day_delay', count(*), min(flight_date), max(flight_date),
        count(DISTINCT airport)
-FROM lake.gold_airport_day_delay;
+FROM skynyc.lake.gold_airport_day_delay;
 
 -- 6. The 2001-09 ground stop, day by day (national scheduled arrivals into
 --    the NYC three; the week the system stopped).
@@ -69,6 +69,6 @@ SELECT flight_date,
        sum(cancelled)                   AS cancelled,
        round(sum(cancelled) / nullif(sum(arrivals_scheduled), 0) * 100, 1)
                                         AS pct_cancelled
-FROM lake.gold_airport_day_delay
+FROM skynyc.lake.gold_airport_day_delay
 WHERE flight_date BETWEEN '2001-09-08' AND '2001-09-20'
 GROUP BY 1 ORDER BY 1;

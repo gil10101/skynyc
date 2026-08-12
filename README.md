@@ -33,6 +33,26 @@ is the point.
 | ![Spark streaming query statistics: input rate, process rate, batch durations over hundreds of batches](assets/img/spark-live-query-stats.png) *The live query's statistics: rates, rows, and batch durations across hundreds of micro-batches* | ![Dagster run detail: ground-truth pull with per-airport arrival counts and credit accounting in the event log](assets/img/dagster-gt-run.png) *A ground-truth run: 1,592 arrivals pulled, per-airport counts and API-credit accounting in the log* |
 | ![Derived flight events queried live from Postgres](assets/img/events-live.png) *The product no feed provides: derived arrivals and holding patterns* | ![Azure ADLS Gen2 bronze archive listing](assets/img/azure-lake.png) *The lake: partitioned Parquet archive plus database backups* |
 
+### The historical lakehouse
+
+38 years of BTS on-time performance (181M rows after dedupe) and 4.3M METAR observations,
+landed by Data Factory and built into a bronze/silver/gold Delta medallion by a Databricks
+job that Dagster triggers over the Jobs API. Postgres stays the only serving store; a
+serverless SQL warehouse over Unity Catalog external tables is the analyst's window into
+the history. BTS serves no PREZIP files for 1990-1999 (verified against both naming
+schemes) — the gap is landed around, documented, and self-heals if the source restores it.
+
+![Databricks multi-task run: bronze, silver, gold all green with durations](assets/img/databricks-run-dag.png)
+*The medallion build, end to end: 344 monthly archives to bronze in 2h58m, the 181M-row
+typed dedupe in 31m, weather parse and gold marts in minutes. Databricks labels Jobs-API
+runs "Manually" — the caller is the Dagster asset; lineage is blank by design because the
+jobs write governed paths, not catalog tables.*
+
+| | |
+|---|---|
+| ![Bronze ingestion driver log: per-month row counts across 344 archives](assets/img/databricks-bronze-ingest.png) *Bronze's receipt: every month logged with row counts, 181,076,399 rows across the span* | ![Spark UI mid-silver: 200-task stage, 6.2 GiB shuffle read](assets/img/databricks-spark-ui.png) *Silver's dedupe is the genuinely distributed workload: a 200-task Delta write over 6.2 GiB of shuffle* |
+| ![SQL editor: arrival delay by flight category over 38 years, sub-second on serverless](assets/img/databricks-sql-thesis.png) *The thesis in one query, 0.8s on the serverless warehouse: average arrival delay runs 8-14x higher on LIFR days than VFR days at all three airports* | ![Unity Catalog: external Delta tables over the lake with full schema](assets/img/databricks-catalog.png) *The governed window: external tables over the same Delta paths the jobs write — the warehouse's only route to the lake* |
+
 ---
 
 ## Architecture

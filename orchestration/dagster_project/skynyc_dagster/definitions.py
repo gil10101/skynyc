@@ -227,13 +227,30 @@ def databricks_medallion_run(context) -> None:  # noqa: ANN001 — unannotated p
     the backup asset.
     """
     host = os.environ.get("DATABRICKS_HOST")
-    token = os.environ.get("DATABRICKS_TOKEN")
     job_id = os.environ.get("MEDALLION_JOB_ID")
-    if not host or not token or not job_id:
+    client_id = os.environ.get("DATABRICKS_CLIENT_ID")
+    client_secret = os.environ.get("DATABRICKS_CLIENT_SECRET")
+    has_oauth = bool(client_id and client_secret)
+    has_pat = bool(os.environ.get("DATABRICKS_TOKEN"))
+    if not host or not job_id or not (has_oauth or has_pat):
         context.log.warning(
-            "DATABRICKS_HOST/DATABRICKS_TOKEN/MEDALLION_JOB_ID not set — skipping medallion run"
+            "Databricks credentials/MEDALLION_JOB_ID not set — skipping medallion run"
         )
         return
+
+    if has_oauth:
+        # OAuth M2M: the service principal mints a one-hour token per run.
+        # No long-lived bearer token exists anywhere in the system.
+        oauth = requests.post(
+            f"{host}/oidc/v1/token",
+            auth=(client_id, client_secret),
+            data={"grant_type": "client_credentials", "scope": "all-apis"},
+            timeout=TIMEOUT_S,
+        )
+        oauth.raise_for_status()
+        token = oauth.json()["access_token"]
+    else:
+        token = os.environ["DATABRICKS_TOKEN"]
 
     headers = {"Authorization": f"Bearer {token}"}
     start = requests.post(
