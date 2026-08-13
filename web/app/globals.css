@@ -1,0 +1,79 @@
+/* Vendor CSS must live in a layer: Tailwind v4 utilities are layered, and any
+   unlayered rule (maplibregl-map { position: relative }) would beat them and
+   collapse the absolutely-positioned map container. */
+@layer vendor, theme, base, components, utilities;
+@import "maplibre-gl/dist/maplibre-gl.css" layer(vendor);
+@import "tailwindcss";
+
+/* SkyNYC token system — same voice as the case-study figure set.
+   Mono is the instrument voice (data, numbers, timestamps); sans is prose. */
+@theme {
+  --color-page: #0d1117;
+  --color-surface: #161b22;
+  --color-surface-2: #1b222c;
+  --color-border: #2a323d;
+  --color-border-2: #3a444f;
+  --color-ink: #e6edf3;
+  --color-ink-2: #b3bec9;
+  --color-muted: #7d8894;
+  --color-faint: #5a636d;
+
+  --color-jfk: #3987e5;
+  --color-lga: #d95926;
+  --color-ewr: #199e70;
+
+  --color-vfr: #0ca30c;
+  --color-mvfr: #3987e5;
+  --color-ifr: #e34948;
+  --color-lifr: #9085e9;
+
+  --color-good: #0ca30c;
+  --color-warn: #fab219;
+  --color-bad: #d03b3b;
+
+  --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+html {
+  background: var(--color-page);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  scroll-behavior: smooth;
+}
+
+/* the LIVE heartbeat — one breath per SSE tick, driven by re-triggering the
+   animation from JS; reduced-motion users get a steady dot instead */
+@keyframes pulse-breathe {
+  0% { transform: scale(1); opacity: 1; }
+  35% { transform: scale(1.6); opacity: 0.45; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.pulse-tick { animation: pulse-breathe 0.9s ease-out 1; }
+
+@keyframes radar-sweep {
+  0% { transform: scale(0.25); opacity: 0.7; }
+  100% { transform: scale(1); opacity: 0; }
+}
+.radar-ring {
+  animation: radar-sweep 3s ease-out 1;
+  transform-origin: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse-tick, .radar-ring { animation: none; }
+  html { scroll-behavior: auto; }
+}
+
+/* recharts: recessive chrome on dark */
+.recharts-cartesian-axis-tick text { fill: #7d8894; font-family: var(--font-mono); font-size: 10.5px; }
+.recharts-cartesian-grid line { stroke: #2a323d; }
+.recharts-default-tooltip { border-radius: 8px; }
+
+.maplibregl-ctrl-attrib {
+  background: rgba(13, 17, 23, 0.7) !important;
+  color: #7d8894 !important;
+  font: 10px/1.4 var(--font-sans) !important;
+}
+.maplibregl-ctrl-attrib a { color: #b3bec9 !important; }
