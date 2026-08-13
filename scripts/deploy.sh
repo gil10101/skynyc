@@ -39,6 +39,7 @@ echo "==> sync working tree -> $VPS_HOST:~/$DEST (includes .env — the box need
 rsync -az --delete -e "ssh -i $KEY -o StrictHostKeyChecking=accept-new" \
   --exclude .git --exclude data/ --exclude checkpoints/ --exclude backups/ \
   --exclude __pycache__ --exclude .venv --exclude .pytest_cache --exclude .DS_Store \
+  --exclude web/node_modules --exclude web/.next --exclude web/test-results \
   "$REPO_ROOT/" "$VPS_HOST:~/$DEST/"
 
 echo "==> up + topics + ingest"

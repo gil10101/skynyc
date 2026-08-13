@@ -117,7 +117,10 @@ function ThemedMap({ theme, live, paused }: { theme: Theme; live: Live; paused: 
 
     for (const [icao, a] of Object.entries(AIRPORTS)) {
       const el = document.createElement("div");
-      el.className = "pointer-events-none relative";
+      // no utility classes here: maplibre owns this element's positioning, and
+      // our utilities layer would override its position:absolute (the ring
+      // would flow to the container's left edge while the label floated)
+      el.style.pointerEvents = "none";
       el.innerHTML = `
         <span data-sweep style="position:absolute;left:50%;top:50%;margin-left:-32px;margin-top:-32px;display:block;height:64px;width:64px;border-radius:9999px;border:1px solid transparent;opacity:0"></span>
         <span data-ring style="display:block;height:12px;width:12px;transform:rotate(45deg);border:2px solid transparent;background:var(--background)"></span>
