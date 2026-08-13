@@ -3,7 +3,7 @@
 /** NOW row: one card per airport (category, wind, visibility, ceiling, active
  *  alerts) + the freshness stat that mirrors the alerting rule's thresholds. */
 
-import { AIRPORT, AIRPORT_LABEL, AIRPORT_ORDER, CATEGORY } from "@/lib/palette";
+import { AIRPORT_LABEL, AIRPORT_ORDER, usePaletteOrDark } from "@/lib/palette";
 import type { Live } from "@/lib/useLive";
 
 function fmt(value: number | null | undefined, unit: string, digits = 0): string {
@@ -12,10 +12,11 @@ function fmt(value: number | null | undefined, unit: string, digits = 0): string
 }
 
 export default function ConditionsRow({ live, airports }: { live: Live; airports: string[] }) {
+  const P = usePaletteOrDark();
   const snap = live.snap;
   const freshness = snap?.freshness_s ?? null;
   const freshColor =
-    freshness == null || freshness > 900 ? "#d03b3b" : freshness > 120 ? "#fab219" : "#0ca30c";
+    freshness == null || freshness > 900 ? P.bad : freshness > 120 ? P.warn : P.good;
 
   return (
     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -27,14 +28,14 @@ export default function ConditionsRow({ live, airports }: { live: Live; airports
           <div key={icao} className="rounded-xl border border-border bg-surface p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="h-2.5 w-2.5 rounded-full" style={{ background: AIRPORT[icao] }} />
+                <span className="h-2.5 w-2.5 rounded-full" style={{ background: P.airport[icao] }} />
                 <span className="font-mono text-[13px] font-bold text-ink">{AIRPORT_LABEL[icao]}</span>
               </div>
               <span
                 className="rounded-md px-2 py-0.5 font-mono text-[11px] font-bold"
                 style={{
-                  color: cat ? CATEGORY[cat] : "#7d8894",
-                  background: cat ? `${CATEGORY[cat]}1f` : "#7d889415",
+                  color: cat ? P.category[cat] : P.neutral,
+                  background: cat ? `${P.category[cat]}1f` : `${P.neutral}15`,
                 }}
               >
                 {cat ?? "no data"}

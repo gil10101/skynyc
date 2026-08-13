@@ -5,46 +5,105 @@
 @import "maplibre-gl/dist/maplibre-gl.css" layer(vendor);
 @import "tailwindcss";
 
-/* SkyNYC token system — same voice as the case-study figure set.
-   Mono is the instrument voice (data, numbers, timestamps); sans is prose. */
-@theme {
-  --color-page: #0d1117;
-  --color-surface: #161b22;
-  --color-surface-2: #1b222c;
-  --color-border: #2a323d;
-  --color-border-2: #3a444f;
-  --color-ink: #e6edf3;
-  --color-ink-2: #b3bec9;
-  --color-muted: #7d8894;
-  --color-faint: #5a636d;
+/* gillu.me design system §1 — light is Cursor Light, dark is the owner's
+   editor palette. Tokens are CSS variables; components never hardcode hex. */
+:root {
+  --background: #ffffff;
+  --foreground: #1a1a1a;
+  --muted-foreground: #666666;
+  --faint-foreground: #999999;
+  --secondary: #f0f0f0;
+  --surface: #ffffff;
+  --surface-2: #f5f5f5;
+  --border: #e0e0e0;
+  --sidebar: #f5f5f5;
+  --accent: #0066cc;
+  --foreground-2: #333333;
+  --border-2: #d0d0d0;
+  --good: #059669;
+  --warn: #d97700;
+  --bad: #cc0000;
+}
 
-  --color-jfk: #3987e5;
-  --color-lga: #d95926;
-  --color-ewr: #199e70;
+:root[data-theme="dark"] {
+  --background: #1a1a1a;
+  --foreground: #d8dee9;
+  --muted-foreground: #8e959e;
+  --faint-foreground: #505050;
+  --secondary: #2a2a2a;
+  --surface: #1f1f1f;
+  --surface-2: #2a2a2a;
+  --border: #2e2e2e;
+  --sidebar: #1f1f1f;
+  --accent: #85c1fc;
+  --foreground-2: #b0b7c3;
+  --border-2: #3a3a3a;
+  --good: #a3be8c;
+  --warn: #ebc88d;
+  --bad: #bf616a;
+}
 
-  --color-vfr: #0ca30c;
-  --color-mvfr: #3987e5;
-  --color-ifr: #e34948;
-  --color-lifr: #9085e9;
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --background: #1a1a1a;
+    --foreground: #d8dee9;
+    --muted-foreground: #8e959e;
+    --faint-foreground: #505050;
+    --secondary: #2a2a2a;
+    --surface: #1f1f1f;
+    --surface-2: #2a2a2a;
+    --border: #2e2e2e;
+    --sidebar: #1f1f1f;
+    --accent: #85c1fc;
+    --foreground-2: #b0b7c3;
+    --border-2: #3a3a3a;
+    --good: #a3be8c;
+    --warn: #ebc88d;
+    --bad: #bf616a;
+  }
+}
 
-  --color-good: #0ca30c;
-  --color-warn: #fab219;
-  --color-bad: #d03b3b;
-
-  --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+@theme inline {
+  --color-page: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-secondary: var(--secondary);
+  --color-border: var(--border);
+  --color-sidebar: var(--sidebar);
+  --color-ink: var(--foreground);
+  --color-ink-2: var(--foreground-2);
+  --color-border-2: var(--border-2);
+  --color-muted: var(--muted-foreground);
+  --color-faint: var(--faint-foreground);
+  --color-accent: var(--accent);
+  --color-good: var(--good);
+  --color-warn: var(--warn);
+  --color-bad: var(--bad);
+  --font-sans: var(--font-geist-sans), system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 html {
-  background: var(--color-page);
-  color: var(--color-ink);
-  font-family: var(--font-sans);
-  -webkit-font-smoothing: antialiased;
+  background: var(--background);
+  color: var(--foreground);
   scroll-behavior: smooth;
 }
 
-/* the LIVE heartbeat — one breath per SSE tick, driven by re-triggering the
-   animation from JS; reduced-motion users get a steady dot instead */
+/* fonts declared on body: the next/font variables are bound to body's class,
+   so an html-level var() reference would be invalid and fall back to serif */
+body {
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* global focus ring — design system §5, never overridden per component */
+:where(a, button):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* the LIVE heartbeat — one breath per SSE tick (re-triggered from JS) */
 @keyframes pulse-breathe {
   0% { transform: scale(1); opacity: 1; }
   35% { transform: scale(1.6); opacity: 0.45; }
@@ -56,24 +115,46 @@ html {
   0% { transform: scale(0.25); opacity: 0.7; }
   100% { transform: scale(1); opacity: 0; }
 }
-.radar-ring {
-  animation: radar-sweep 3s ease-out 1;
-  transform-origin: center;
-}
+.radar-ring { animation: radar-sweep 3s ease-out 1; transform-origin: center; }
 
+/* reveal-on-scroll (design system §6) */
+.reveal { opacity: 0; transform: translateY(12px); transition: opacity 500ms ease-out, transform 500ms ease-out; }
+.reveal.is-visible { opacity: 1; transform: translateY(0); }
+
+/* theme sweep companion — required or the View Transition crossfades (§7c) */
+::view-transition-old(root),
+::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
+::view-transition-old(root) { z-index: 1; }
+::view-transition-new(root) { z-index: 2; }
+
+/* reduced motion is a hard kill switch (§6) */
 @media (prefers-reduced-motion: reduce) {
-  .pulse-tick, .radar-ring { animation: none; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
   html { scroll-behavior: auto; }
+  .reveal { opacity: 1; transform: none; }
 }
 
-/* recharts: recessive chrome on dark */
-.recharts-cartesian-axis-tick text { fill: #7d8894; font-family: var(--font-mono); font-size: 10.5px; }
-.recharts-cartesian-grid line { stroke: #2a323d; }
-.recharts-default-tooltip { border-radius: 8px; }
+/* recharts chrome follows the tokens */
+.recharts-cartesian-axis-tick text {
+  fill: var(--muted-foreground);
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 10.5px;
+}
+.recharts-cartesian-grid line { stroke: var(--border); }
 
 .maplibregl-ctrl-attrib {
-  background: rgba(13, 17, 23, 0.7) !important;
-  color: #7d8894 !important;
-  font: 10px/1.4 var(--font-sans) !important;
+  background: color-mix(in srgb, var(--background) 75%, transparent) !important;
+  color: var(--muted-foreground) !important;
+  font: 10px/1.4 var(--font-geist-sans), sans-serif !important;
 }
-.maplibregl-ctrl-attrib a { color: #b3bec9 !important; }
+.maplibregl-ctrl-attrib a { color: var(--foreground) !important; }
+.maplibregl-ctrl-group {
+  background: var(--surface) !important;
+  border: 1px solid var(--border);
+  box-shadow: none !important;
+}
+.maplibregl-ctrl-group button { background: transparent !important; }

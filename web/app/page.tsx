@@ -8,6 +8,8 @@ import Controls from "@/components/Controls";
 import ConditionsRow from "@/components/ConditionsRow";
 import LiveMap from "@/components/LiveMap";
 import StatusBar from "@/components/StatusBar";
+import ThemeToggle from "@/components/ThemeToggle";
+import Reveal from "@/components/Reveal";
 import { ArrivalsChart, AirborneChart, WindChart, WindScatter } from "@/components/liveCharts";
 import { EventsTable, QualityChart, QualityTiles } from "@/components/proof";
 import { Causes, Monthly, Seasonality, Staircase, WorstDays } from "@/components/record";
@@ -31,10 +33,11 @@ function Dashboard() {
 
   return (
     <main>
+      <ThemeToggle />
       <StatusBar live={live} paused={paused} onPause={setPaused} />
       <LiveMap live={live} paused={paused} />
 
-      <Section
+      <Reveal><Section
         eyebrow="NOW · LIVE OPERATIONS"
         title="What the three fields are doing right now"
         note="Positions poll every 30 seconds from ADS-B; weather every 5 minutes from NWS stations on each field. Every panel below derives from those two feeds — nothing is read from a delay product."
@@ -49,10 +52,10 @@ function Dashboard() {
           <WindChart filters={filters} />
           <WindScatter filters={filters} />
         </div>
-      </Section>
+      </Section></Reveal>
 
       <div className="border-y border-border bg-surface/40">
-        <Section
+        <Reveal><Section
           eyebrow="PROOF · THE VALIDATION LOOP"
           title="The detector grades itself against independent truth, daily"
           note="Arrivals, holding patterns and go-arounds exist in no feed — they are derived from raw telemetry by per-aircraft state machines, then matched every morning against OpenSky's separate arrival records (same aircraft, same airport, within ten minutes). Only arrivals have ground truth; holding and go-arounds are shown but not independently scored. Unscored days display as gaps, never as zeros."
@@ -62,10 +65,10 @@ function Dashboard() {
             <QualityChart filters={filters} />
             <EventsTable filters={filters} />
           </div>
-        </Section>
+        </Section></Reveal>
       </div>
 
-      <Section
+      <Reveal><Section
         eyebrow="RECORD · 38 YEARS OF WEATHER COST"
         title="What weather has cost NYC arrivals since 1987"
         note="181 million federal on-time records, rebuilt into one row per airport-day and joined with historical METAR. Flight categories are derived from each day's worst observed visibility and ceiling. The 1990s are absent because the source publishes no files for that decade."
@@ -79,7 +82,7 @@ function Dashboard() {
         <div className="mt-4">
           <Monthly />
         </div>
-      </Section>
+      </Section></Reveal>
 
       <footer className="border-t border-border">
         <div className="mx-auto flex max-w-[1400px] flex-wrap items-start justify-between gap-6 px-4 py-8 text-[11.5px] text-muted">
@@ -100,8 +103,9 @@ function Dashboard() {
             </p>
           </div>
           <div className="flex flex-col gap-1.5 font-mono text-[11px]">
-            <a className="text-ink-2 hover:text-ink" href="https://github.com/gil10101/skynyc">github.com/gil10101/skynyc</a>
-            <a className="text-ink-2 hover:text-ink" href="https://gillu.me">gillu.me</a>
+            <a className="text-ink-2 transition-colors hover:text-accent" href="https://github.com/gil10101/skynyc">github.com/gil10101/skynyc</a>
+            <a className="text-ink-2 transition-colors hover:text-accent" href="https://gillu.me">gillu.me</a>
+            <span className="text-[11px] text-muted/70">last updated 08-13-2026</span>
           </div>
         </div>
       </footer>

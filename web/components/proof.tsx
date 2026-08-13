@@ -8,12 +8,13 @@ import {
   CartesianGrid, Legend, Line, LineChart, ReferenceLine, ResponsiveContainer,
   Tooltip, XAxis, YAxis,
 } from "recharts";
-import { AIRPORT, AIRPORT_LABEL, AIRPORT_ORDER } from "@/lib/palette";
+import { AIRPORT_LABEL, AIRPORT_ORDER, usePaletteOrDark } from "@/lib/palette";
 import type { EventRow, QualityDay } from "@/lib/types";
 import type { Filters } from "@/lib/useFilters";
-import { ChartCard, TOOLTIP_STYLE, useData } from "./ui";
+import { ChartCard, tooltipStyle, useData } from "./ui";
 
 export function QualityTiles({ filters }: { filters: Filters }) {
+  const P = usePaletteOrDark();
   const q = useData<{ days: QualityDay[] }>("/v1/quality", { days: 30 }, "quality");
   const days = q.data?.days ?? [];
   const scored = days.filter((d) => d.precision != null);
@@ -27,7 +28,7 @@ export function QualityTiles({ filters }: { filters: Filters }) {
         return (
           <div key={icao} className="rounded-xl border border-border bg-surface p-4">
             <div className="flex items-center gap-2">
-              <span className="h-2.5 w-2.5 rounded-full" style={{ background: AIRPORT[icao] }} />
+              <span className="h-2.5 w-2.5 rounded-full" style={{ background: P.airport[icao] }} />
               <span className="font-mono text-[12.5px] font-bold text-ink">{AIRPORT_LABEL[icao]}</span>
               <span className="ml-auto font-mono text-[10px] text-faint">
                 {row ? row.quality_date : "no scored day"}
@@ -48,13 +49,14 @@ export function QualityTiles({ filters }: { filters: Filters }) {
 }
 
 function Metric({ label, value, target }: { label: string; value: number | null; target: number }) {
+  const P = usePaletteOrDark();
   const met = value != null && value >= target;
   return (
     <div>
       <div className="font-mono text-[10px] tracking-widest text-muted">{label.toUpperCase()}</div>
       <div
         className="mt-1 font-mono text-[26px] font-bold leading-none"
-        style={{ color: value == null ? "#5a636d" : met ? "#0ca30c" : "#fab219" }}
+        style={{ color: value == null ? P.faint : met ? P.good : P.warn }}
       >
         {value == null ? "—" : `${(value * 100).toFixed(1)}%`}
       </div>
@@ -64,6 +66,7 @@ function Metric({ label, value, target }: { label: string; value: number | null;
 }
 
 export function QualityChart({ filters }: { filters: Filters }) {
+  const P = usePaletteOrDark();
   const q = useData<{ days: QualityDay[] }>("/v1/quality", { days: 30 }, "quality");
   const rows = (q.data?.days ?? []).filter((d) => filters.airports.includes(d.airport));
   const byDate = new Map<string, Record<string, number | string | null>>();
@@ -85,18 +88,18 @@ export function QualityChart({ filters }: { filters: Filters }) {
           <CartesianGrid vertical={false} />
           <XAxis dataKey="date" />
           <YAxis domain={[0, 1]} tickFormatter={(v) => `${Math.round(v * 100)}%`} />
-          <Tooltip {...TOOLTIP_STYLE} formatter={(v) => (v == null ? "—" : `${(Number(v) * 100).toFixed(1)}%`)} />
+          <Tooltip {...tooltipStyle(P)} formatter={(v) => (v == null ? "—" : `${(Number(v) * 100).toFixed(1)}%`)} />
           <Legend
             formatter={(v: string) => `${AIRPORT_LABEL[v.slice(0, 4)]} ${v.endsWith("_p") ? "precision" : "recall"}`}
             wrapperStyle={{ fontSize: 11 }}
           />
-          <ReferenceLine y={0.85} stroke="#7d8894" strokeDasharray="2 4" />
-          <ReferenceLine y={0.8} stroke="#5a636d" strokeDasharray="2 4" />
+          <ReferenceLine y={0.85} stroke={P.neutral} strokeDasharray="2 4" />
+          <ReferenceLine y={0.8} stroke={P.faint} strokeDasharray="2 4" />
           {AIRPORT_ORDER.filter((a) => filters.airports.includes(a)).map((a) => (
-            <Line key={`${a}_p`} dataKey={`${a}_p`} stroke={AIRPORT[a]} strokeWidth={2} connectNulls={false} />
+            <Line key={`${a}_p`} dataKey={`${a}_p`} stroke={P.airport[a]} strokeWidth={2} connectNulls={false} />
           ))}
           {AIRPORT_ORDER.filter((a) => filters.airports.includes(a)).map((a) => (
-            <Line key={`${a}_r`} dataKey={`${a}_r`} stroke={AIRPORT[a]} strokeWidth={1.25} strokeDasharray="4 4" connectNulls={false} />
+            <Line key={`${a}_r`} dataKey={`${a}_r`} stroke={P.airport[a]} strokeWidth={1.25} strokeDasharray="4 4" connectNulls={false} />
           ))}
         </LineChart>
       </ResponsiveContainer>
@@ -104,13 +107,10 @@ export function QualityChart({ filters }: { filters: Filters }) {
   );
 }
 
-const TYPE_BADGE: Record<string, string> = {
-  arrival: "#199e70",
-  holding: "#fab219",
-  go_around: "#e34948",
-};
+
 
 export function EventsTable({ filters }: { filters: Filters }) {
+  const P = usePaletteOrDark();
   const q = useData<{ events: EventRow[] }>("/v1/events", { limit: 25 }, undefined);
   const rows = (q.data?.events ?? []).filter((e) => filters.airports.includes(e.airport));
   return (
@@ -138,11 +138,11 @@ export function EventsTable({ filters }: { filters: Filters }) {
                   {new Date(e.event_ts).toISOString().slice(5, 16).replace("T", " ")}
                 </td>
                 <td className="py-1.5 pr-3">
-                  <span style={{ color: TYPE_BADGE[e.event_type] }}>{e.event_type}</span>
+                  <span style={{ color: P.eventType[e.event_type] }}>{e.event_type}</span>
                 </td>
                 <td className="py-1.5 pr-3">
                   <span className="flex items-center gap-1.5">
-                    <span className="h-1.5 w-1.5 rounded-full" style={{ background: AIRPORT[e.airport] }} />
+                    <span className="h-1.5 w-1.5 rounded-full" style={{ background: P.airport[e.airport] }} />
                     {AIRPORT_LABEL[e.airport]}
                   </span>
                 </td>

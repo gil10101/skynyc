@@ -1,13 +1,21 @@
 "use client";
 
-/** The hero: full-bleed dark map, dead-reckoned aircraft, and the signature —
- *  radar sweeps on the airport markers fired by real SSE ticks. When the data
- *  stops, the sweeps stop: the page visibly flatlines (spec §4). */
+/** The hero: full-bleed themed map, dead-reckoned aircraft, and the signature —
+ *  radar sweeps on the airport markers fired by real SSE ticks; sweeps stop
+ *  when the data stops (spec §4).
+ *
+ *  Airport markers are native maplibregl.Markers: the map moves them inside
+ *  its own render transform, so they track pan/zoom exactly with zero React
+ *  work — the previous approach (React re-render per move event) lagged and
+ *  could paint a stale frame. Only their colors are updated, imperatively,
+ *  when a snapshot or the theme changes. */
 
 import maplibregl from "maplibre-gl";
 import { useEffect, useRef, useState } from "react";
 import { advance, MAX_EXTRAPOLATE_S } from "@/lib/deadReckon";
-import { altitudeColor, CATEGORY } from "@/lib/palette";
+import { altitudeColor, paletteFor, type DataPalette } from "@/lib/palette";
+import type { Theme } from "@/lib/theme";
+import { useTheme } from "@/lib/useTheme";
 import type { Live } from "@/lib/useLive";
 import type { Position } from "@/lib/types";
 
@@ -17,25 +25,34 @@ const AIRPORTS: Record<string, { lat: number; lon: number; label: string }> = {
   KEWR: { lat: 40.6895, lon: -74.1745, label: "EWR" },
 };
 
-const STYLE: maplibregl.StyleSpecification = {
-  version: 8,
-  sources: {
-    carto: {
-      type: "raster",
-      tiles: [
-        "https://a.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}@2x.png",
-        "https://b.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}@2x.png",
-      ],
-      tileSize: 256,
-      attribution:
-        '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/attributions">CARTO</a>',
+function styleFor(theme: Theme): maplibregl.StyleSpecification {
+  const flavor = theme === "light" ? "light_nolabels" : "dark_nolabels";
+  const bg = theme === "light" ? "#ffffff" : "#1a1a1a";
+  return {
+    version: 8,
+    sources: {
+      carto: {
+        type: "raster",
+        tiles: [
+          `https://a.basemaps.cartocdn.com/${flavor}/{z}/{x}/{y}@2x.png`,
+          `https://b.basemaps.cartocdn.com/${flavor}/{z}/{x}/{y}@2x.png`,
+        ],
+        tileSize: 256,
+        attribution:
+          '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/attributions">CARTO</a>',
+      },
     },
-  },
-  layers: [
-    { id: "bg", type: "background", paint: { "background-color": "#0d1117" } },
-    { id: "carto", type: "raster", source: "carto", paint: { "raster-opacity": 0.85 } },
-  ],
-};
+    layers: [
+      { id: "bg", type: "background", paint: { "background-color": bg } },
+      {
+        id: "carto",
+        type: "raster",
+        source: "carto",
+        paint: { "raster-opacity": theme === "light" ? 1 : 0.85 },
+      },
+    ],
+  };
+}
 
 interface Hover {
   x: number;
@@ -43,53 +60,116 @@ interface Hover {
   p: Position;
 }
 
+interface MarkerRefs {
+  marker: maplibregl.Marker;
+  ring: HTMLSpanElement;
+  label: HTMLSpanElement;
+  sweepHost: HTMLSpanElement;
+}
+
 export default function LiveMap({ live, paused }: { live: Live; paused: boolean }) {
+  const theme = useTheme();
+  // Canvas + raster tiles can't re-theme through props — remount per theme
+  // (design system §7b rule 3). Placeholder keeps hydration identical.
+  if (!theme) {
+    return (
+      <div
+        aria-hidden="true"
+        className="w-full border-b border-border"
+        style={{ height: "68vh", minHeight: 440 }}
+      />
+    );
+  }
+  return <ThemedMap key={theme} theme={theme} live={live} paused={paused} />;
+}
+
+function ThemedMap({ theme, live, paused }: { theme: Theme; live: Live; paused: boolean }) {
+  const palette = paletteFor(theme);
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const markersRef = useRef<Record<string, MarkerRefs>>({});
   const [hover, setHover] = useState<Hover | null>(null);
   const positionsRef = useRef<{ at: number; list: Position[] }>({ at: 0, list: [] });
   const liveRef = useRef(live);
   liveRef.current = live;
   const pausedRef = useRef(paused);
   pausedRef.current = paused;
+  const paletteRef = useRef<DataPalette>(palette);
+  paletteRef.current = palette;
 
-  // map init
+  // map + native markers init
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
-    let map: maplibregl.Map;
-    try {
-      map = new maplibregl.Map({
+    const map = new maplibregl.Map({
       container: containerRef.current,
-      style: STYLE,
+      style: styleFor(theme),
       center: [-73.93, 40.71],
       zoom: 9.1,
       minZoom: 7.5,
       maxZoom: 12,
       attributionControl: { compact: true },
       dragRotate: false,
-      });
-    } catch (e) {
-      console.error("MAP INIT FAILED", e);
-      return;
-    }
-    map.on("error", (e) => console.error("MAP ERROR", e.error?.message ?? e));
-    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-left");
+    });
+    // zoom control bottom-right: standard map position, clear of the status bar
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
     mapRef.current = map;
+
+    for (const [icao, a] of Object.entries(AIRPORTS)) {
+      const el = document.createElement("div");
+      el.className = "pointer-events-none relative";
+      el.innerHTML = `
+        <span data-sweep style="position:absolute;left:50%;top:50%;margin-left:-32px;margin-top:-32px;display:block;height:64px;width:64px;border-radius:9999px;border:1px solid transparent;opacity:0"></span>
+        <span data-ring style="display:block;height:12px;width:12px;transform:rotate(45deg);border:2px solid transparent;background:var(--background)"></span>
+        <span data-label style="position:absolute;left:50%;top:16px;transform:translateX(-50%);font-family:var(--font-geist-mono),monospace;font-size:11px;font-weight:700;letter-spacing:0.05em">${a.label}</span>`;
+      const marker = new maplibregl.Marker({ element: el, anchor: "center" })
+        .setLngLat([a.lon, a.lat])
+        .addTo(map);
+      markersRef.current[icao] = {
+        marker,
+        ring: el.querySelector("[data-ring]")!,
+        label: el.querySelector("[data-label]")!,
+        sweepHost: el.querySelector("[data-sweep]")!,
+      };
+    }
+
     // layout can settle after hydration; a zero-height first measure sticks otherwise
     const settle = setTimeout(() => map.resize(), 250);
     map.once("load", () => map.resize());
     return () => {
       clearTimeout(settle);
+      for (const m of Object.values(markersRef.current)) m.marker.remove();
+      markersRef.current = {};
       map.remove();
       mapRef.current = null;
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // theme changes remount the whole component (key)
 
-  // absorb each snapshot
+  // absorb each snapshot; recolor markers + fire the sweep imperatively —
+  // zero React work on the map layer per tick
   useEffect(() => {
     if (live.snap) positionsRef.current = { at: Date.now(), list: live.snap.positions };
-  }, [live.snap]);
+    const conditions = live.snap?.conditions ?? [];
+    for (const [icao, refs] of Object.entries(markersRef.current)) {
+      const cat = conditions.find((c) => c.station === icao)?.flight_category ?? null;
+      const color = cat
+        ? (paletteRef.current.category[cat] ?? paletteRef.current.neutral)
+        : paletteRef.current.neutral;
+      refs.ring.style.borderColor = color;
+      refs.label.style.color = color;
+      refs.sweepHost.style.borderColor = color;
+      // idle at opacity 0 — the animation carries all visibility, so the
+      // sweep truly stops (not lingers) when the data stops
+      if (live.mode === "live") {
+        refs.sweepHost.classList.remove("radar-ring");
+        void refs.sweepHost.offsetWidth; // restart the CSS animation
+        refs.sweepHost.classList.add("radar-ring");
+      } else {
+        refs.sweepHost.classList.remove("radar-ring");
+      }
+    }
+  }, [live.snap, live.mode, live.tick]);
 
   // render loop — planes on a canvas overlay, dead-reckoned between ticks
   useEffect(() => {
@@ -115,6 +195,7 @@ export default function LiveMap({ live, paused }: { live: Live; paused: boolean 
 
       const { at, list } = positionsRef.current;
       const mode = liveRef.current.mode;
+      const pal = paletteRef.current;
       const dtS =
         pausedRef.current || reduced || mode !== "live" ? 0 : (Date.now() - at) / 1000;
 
@@ -128,16 +209,19 @@ export default function LiveMap({ live, paused }: { live: Live; paused: boolean 
         const stale = p.age_s + dtS > MAX_EXTRAPOLATE_S + 60;
         ctx.save();
         ctx.translate(point.x, point.y);
-        ctx.rotate((((p.track_deg ?? 0) - 0) * Math.PI) / 180);
+        ctx.rotate(((p.track_deg ?? 0) * Math.PI) / 180);
         ctx.globalAlpha = stale ? 0.35 : 0.95;
-        ctx.fillStyle = altitudeColor(p.alt_m);
-        // plane glyph: slender delta pointing up (north) pre-rotation
+        // halo first so glyphs stay legible over any tile luminance
         ctx.beginPath();
         ctx.moveTo(0, -7);
         ctx.lineTo(4.6, 6);
         ctx.lineTo(0, 3.2);
         ctx.lineTo(-4.6, 6);
         ctx.closePath();
+        ctx.strokeStyle = pal.glyphHalo;
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+        ctx.fillStyle = altitudeColor(pal, p.alt_m);
         ctx.fill();
         ctx.restore();
       }
@@ -176,17 +260,15 @@ export default function LiveMap({ live, paused }: { live: Live; paused: boolean 
     };
   }, []);
 
-  // airport markers + category ring + radar sweep per tick
-  const category = (icao: string) =>
-    live.snap?.conditions.find((c) => c.station === icao)?.flight_category ?? null;
+  const rampCss = `linear-gradient(90deg, ${palette.altStops.map(([, c]) => c).join(",")})`;
 
   return (
-    <div className="relative w-full overflow-hidden border-b border-border" style={{ height: "68vh", minHeight: 440 }}>
+    <div
+      className="relative w-full overflow-hidden border-b border-border"
+      style={{ height: "68vh", minHeight: 440 }}
+    >
       <div ref={containerRef} style={{ position: "absolute", inset: 0 }} />
       <canvas ref={canvasRef} style={{ position: "absolute", inset: 0 }} />
-
-      {/* airport overlays live in map space via project(); re-render on tick */}
-      <AirportMarkers mapRef={mapRef} tick={live.tick} mode={live.mode} category={category} />
 
       {hover && (
         <div
@@ -210,15 +292,9 @@ export default function LiveMap({ live, paused }: { live: Live; paused: boolean 
       )}
 
       {/* altitude legend */}
-      <div className="absolute bottom-8 left-3 rounded-md border border-border bg-page/80 px-3 py-2">
+      <div className="absolute bottom-8 left-3 rounded-lg border border-border bg-page/80 px-3 py-2">
         <div className="font-mono text-[10px] tracking-widest text-muted">ALTITUDE</div>
-        <div
-          className="mt-1 h-1.5 w-36 rounded-full"
-          style={{
-            background:
-              "linear-gradient(90deg,#440154,#3b528b,#21918c,#5ec962,#fde725)",
-          }}
-        />
+        <div className="mt-1 h-1.5 w-36 rounded-full" style={{ background: rampCss }} />
         <div className="mt-0.5 flex justify-between font-mono text-[9.5px] text-faint">
           <span>0</span>
           <span>3 km</span>
@@ -226,68 +302,5 @@ export default function LiveMap({ live, paused }: { live: Live; paused: boolean 
         </div>
       </div>
     </div>
-  );
-}
-
-function AirportMarkers({
-  mapRef,
-  tick,
-  mode,
-  category,
-}: {
-  mapRef: React.RefObject<maplibregl.Map | null>;
-  tick: number;
-  mode: string;
-  category: (icao: string) => string | null;
-}) {
-  const [, force] = useState(0);
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-    const rerender = () => force((n) => n + 1);
-    map.on("move", rerender);
-    map.on("resize", rerender);
-    return () => {
-      map.off("move", rerender);
-      map.off("resize", rerender);
-    };
-  }, [mapRef]);
-
-  const map = mapRef.current;
-  if (!map) return null;
-  return (
-    <>
-      {Object.entries(AIRPORTS).map(([icao, a]) => {
-        const point = map.project([a.lon, a.lat]);
-        const cat = category(icao);
-        const ring = cat ? (CATEGORY[cat] ?? "#7d8894") : "#7d8894";
-        return (
-          <div
-            key={icao}
-            className="pointer-events-none absolute"
-            style={{ left: point.x, top: point.y, transform: "translate(-50%,-50%)" }}
-          >
-            {/* signature: one radar sweep per real data tick — stops when data stops */}
-            {mode === "live" && (
-              <span
-                key={tick}
-                className="radar-ring absolute left-1/2 top-1/2 -ml-8 -mt-8 block h-16 w-16 rounded-full border"
-                style={{ borderColor: ring }}
-              />
-            )}
-            <span
-              className="block h-3 w-3 rotate-45 border-2 bg-page"
-              style={{ borderColor: ring }}
-            />
-            <span
-              className="absolute left-1/2 top-4 -translate-x-1/2 font-mono text-[11px] font-bold tracking-wider"
-              style={{ color: ring }}
-            >
-              {a.label}
-            </span>
-          </div>
-        );
-      })}
-    </>
   );
 }

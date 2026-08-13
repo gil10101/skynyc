@@ -3,12 +3,13 @@
 /** Global filter row: timeframe + airport chips. Chips wear their airport's
  *  fixed hue; the filter changes which series render, never their colors. */
 
-import { AIRPORT, AIRPORT_LABEL, AIRPORT_ORDER } from "@/lib/palette";
+import { AIRPORT_LABEL, AIRPORT_ORDER, usePaletteOrDark } from "@/lib/palette";
 import type { Filters, Timeframe } from "@/lib/useFilters";
 
 const TIMEFRAMES: Timeframe[] = ["3h", "12h", "24h", "7d"];
 
 export default function Controls({ filters, frozen }: { filters: Filters; frozen: boolean }) {
+  const P = usePaletteOrDark();
   return (
     <div className="flex flex-wrap items-center gap-3">
       <div className="flex overflow-hidden rounded-lg border border-border">
@@ -43,7 +44,7 @@ export default function Controls({ filters, frozen }: { filters: Filters; frozen
             >
               <span
                 className="h-2 w-2 rounded-full"
-                style={{ background: on ? AIRPORT[icao] : "#5a636d" }}
+                style={{ background: on ? P.airport[icao] : P.faint }}
               />
               {AIRPORT_LABEL[icao]}
             </button>

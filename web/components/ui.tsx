@@ -6,6 +6,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { get } from "@/lib/api";
+import type { DataPalette } from "@/lib/palette";
 import type { DataSource } from "@/lib/types";
 
 export function Section({ eyebrow, title, note, children }: {
@@ -107,14 +108,18 @@ export function useData<T>(
   return result;
 }
 
-export const TOOLTIP_STYLE = {
-  contentStyle: {
-    background: "#1b222c",
-    border: "1px solid #3a444f",
-    borderRadius: 8,
-    fontSize: 12,
-    fontFamily: "ui-monospace, SF Mono, Menlo, monospace",
-  },
-  labelStyle: { color: "#b3bec9" },
-  itemStyle: { padding: 0 },
-} as const;
+
+export function tooltipStyle(p: DataPalette) {
+  return {
+    contentStyle: {
+      background: p.tooltipBg,
+      border: `1px solid ${p.tooltipBorder}`,
+      borderRadius: 8,
+      fontSize: 12,
+      color: p.tooltipText,
+      fontFamily: "var(--font-geist-mono), ui-monospace, monospace",
+    },
+    labelStyle: { color: p.tooltipText },
+    itemStyle: { padding: 0 },
+  } as const;
+}

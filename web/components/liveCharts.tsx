@@ -7,10 +7,10 @@ import {
   Bar, BarChart, CartesianGrid, Cell, ComposedChart, Legend, Line, LineChart,
   ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis,
 } from "recharts";
-import { AIRPORT, AIRPORT_LABEL, AIRPORT_ORDER, CATEGORY, MUTED } from "@/lib/palette";
+import { AIRPORT_LABEL, AIRPORT_ORDER, usePaletteOrDark } from "@/lib/palette";
 import type { Filters } from "@/lib/useFilters";
 import type { AirbornePoint, ArrivalPoint, ScatterPoint, WindPoint } from "@/lib/types";
-import { ChartCard, TOOLTIP_STYLE, useData } from "./ui";
+import { ChartCard, tooltipStyle, useData } from "./ui";
 
 const shortTime = (iso: string, hours: number) => {
   const d = new Date(iso);
@@ -32,6 +32,7 @@ function pivot<T extends { airport: string; bucket_ts: string }>(
 }
 
 export function ArrivalsChart({ filters }: { filters: Filters }) {
+  const P = usePaletteOrDark();
   const airport = filters.airports.join(",");
   const q = useData<{ series: ArrivalPoint[] }>(
     "/v1/arrivals", { hours: filters.hours, airport }, "arrivals",
@@ -48,10 +49,10 @@ export function ArrivalsChart({ filters }: { filters: Filters }) {
           <CartesianGrid vertical={false} />
           <XAxis dataKey="ts" tickFormatter={(v) => shortTime(v, filters.hours)} minTickGap={40} />
           <YAxis allowDecimals={false} />
-          <Tooltip {...TOOLTIP_STYLE} labelFormatter={(v) => new Date(String(v)).toLocaleString()} />
+          <Tooltip {...tooltipStyle(P)} labelFormatter={(v) => new Date(String(v)).toLocaleString()} />
           <Legend formatter={(v) => AIRPORT_LABEL[v] ?? v} wrapperStyle={{ fontSize: 11.5 }} />
           {AIRPORT_ORDER.filter((a) => filters.airports.includes(a)).map((a) => (
-            <Bar key={a} dataKey={a} stackId="arr" fill={AIRPORT[a]} />
+            <Bar key={a} dataKey={a} stackId="arr" fill={P.airport[a]} />
           ))}
         </BarChart>
       </ResponsiveContainer>
@@ -60,6 +61,7 @@ export function ArrivalsChart({ filters }: { filters: Filters }) {
 }
 
 export function AirborneChart({ filters }: { filters: Filters }) {
+  const P = usePaletteOrDark();
   const airport = filters.airports.join(",");
   const q = useData<{ series: AirbornePoint[] }>(
     "/v1/airborne", { hours: filters.hours, airport }, "airborne",
@@ -83,12 +85,12 @@ export function AirborneChart({ filters }: { filters: Filters }) {
           <CartesianGrid vertical={false} />
           <XAxis dataKey="ts" tickFormatter={(v) => shortTime(v, filters.hours)} minTickGap={40} />
           <YAxis allowDecimals={false} />
-          <Tooltip {...TOOLTIP_STYLE} labelFormatter={(v) => new Date(String(v)).toLocaleString()} />
+          <Tooltip {...tooltipStyle(P)} labelFormatter={(v) => new Date(String(v)).toLocaleString()} />
           <Legend formatter={(v) => (v === "go_arounds" ? "go-arounds" : AIRPORT_LABEL[v] ?? v)} wrapperStyle={{ fontSize: 11.5 }} />
           {AIRPORT_ORDER.filter((a) => filters.airports.includes(a)).map((a) => (
-            <Bar key={a} dataKey={a} stackId="hold" fill={AIRPORT[a]} />
+            <Bar key={a} dataKey={a} stackId="hold" fill={P.airport[a]} />
           ))}
-          <Scatter dataKey="go_arounds" fill="#e34948" shape="circle" />
+          <Scatter dataKey="go_arounds" fill={P.eventType.go_around} shape="circle" />
         </ComposedChart>
       </ResponsiveContainer>
     </ChartCard>
@@ -96,6 +98,7 @@ export function AirborneChart({ filters }: { filters: Filters }) {
 }
 
 export function WindChart({ filters }: { filters: Filters }) {
+  const P = usePaletteOrDark();
   const q = useData<{ series: WindPoint[] }>("/v1/wind", { hours: filters.hours }, "wind");
   const rows = (q.data?.series ?? []).filter((r) => filters.airports.includes(r.station));
   const byTs = new Map<string, Record<string, number | string>>();
@@ -113,18 +116,18 @@ export function WindChart({ filters }: { filters: Filters }) {
           <CartesianGrid vertical={false} />
           <XAxis dataKey="ts" tickFormatter={(v) => shortTime(v, filters.hours)} minTickGap={40} />
           <YAxis width={44} tickFormatter={(v) => String(Math.round(Number(v)))} />
-          <Tooltip {...TOOLTIP_STYLE} labelFormatter={(v) => new Date(String(v)).toLocaleString()} />
+          <Tooltip {...tooltipStyle(P)} labelFormatter={(v) => new Date(String(v)).toLocaleString()} />
           <Legend
             formatter={(v: string) =>
               v.endsWith("_gust") ? `${AIRPORT_LABEL[v.slice(0, 4)]} gust` : AIRPORT_LABEL[v] ?? v}
             wrapperStyle={{ fontSize: 11.5 }}
           />
           {AIRPORT_ORDER.filter((a) => filters.airports.includes(a)).map((a) => (
-            <Line key={a} dataKey={a} stroke={AIRPORT[a]} dot={false} strokeWidth={2} connectNulls />
+            <Line key={a} dataKey={a} stroke={P.airport[a]} dot={false} strokeWidth={2} connectNulls />
           ))}
           {AIRPORT_ORDER.filter((a) => filters.airports.includes(a)).map((a) => (
             <Line
-              key={`${a}_gust`} dataKey={`${a}_gust`} stroke={AIRPORT[a]} strokeDasharray="3 4"
+              key={`${a}_gust`} dataKey={`${a}_gust`} stroke={P.airport[a]} strokeDasharray="3 4"
               dot={false} strokeWidth={1.25} connectNulls strokeOpacity={0.7}
             />
           ))}
@@ -135,6 +138,7 @@ export function WindChart({ filters }: { filters: Filters }) {
 }
 
 export function WindScatter({ filters }: { filters: Filters }) {
+  const P = usePaletteOrDark();
   const q = useData<{ points: ScatterPoint[] }>("/v1/scatter", { days: 7 }, undefined);
   const points = (q.data?.points ?? []).filter((p) => filters.airports.includes(p.airport));
   return (
@@ -149,12 +153,12 @@ export function WindScatter({ filters }: { filters: Filters }) {
           <XAxis dataKey="effective_wind_kmh" type="number" name="wind" unit=" km/h" />
           <YAxis dataKey="arrivals_detected" type="number" name="arrivals/h" allowDecimals={false} />
           <Tooltip
-            {...TOOLTIP_STYLE}
+            {...tooltipStyle(P)}
             formatter={(value, name) => [String(value), name === "arrivals_detected" ? "arrivals/h" : "wind km/h"]}
           />
           <Scatter data={points}>
             {points.map((p, i) => (
-              <Cell key={i} fill={p.flight_category ? (CATEGORY[p.flight_category] ?? MUTED) : MUTED} />
+              <Cell key={i} fill={p.flight_category ? (P.category[p.flight_category] ?? P.neutral) : P.neutral} />
             ))}
           </Scatter>
         </ScatterChart>
