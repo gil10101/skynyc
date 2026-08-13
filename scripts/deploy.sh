@@ -52,6 +52,17 @@ echo "==> migrations"
   [ \"\$f\" = db/init/001_schema.sql ] && continue; \
   $RSUDO docker compose exec -T postgres psql -U skynyc -d skynyc < \"\$f\" || exit 1; done"
 
+# Public-API role password lives only in .env (public-dashboard spec §3.1); set it
+# server-side on every deploy so rotation is just an .env edit + re-deploy. The
+# firewall opens exactly the two ports Caddy publishes — the one loopback exception.
+echo "==> public api role + firewall"
+"${SSH[@]}" "cd $DEST && set -a && . ./.env && set +a; \
+  if [ -n \"\${PG_RO_PASSWORD:-}\" ]; then \
+    printf \"ALTER ROLE skynyc_ro PASSWORD '%s';\" \"\$PG_RO_PASSWORD\" \
+      | $RSUDO docker compose exec -T postgres psql -U skynyc -d skynyc -q; \
+  else echo 'PG_RO_PASSWORD unset — skipping role password'; fi"
+"${SSH[@]}" "$RSUDO ufw allow 80/tcp >/dev/null 2>&1; $RSUDO ufw allow 443/tcp >/dev/null 2>&1; true"
+
 echo "==> stream + batch"
 "${SSH[@]}" "cd $DEST && $RSUDO make stream && $RSUDO make batch"
 
