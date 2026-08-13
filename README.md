@@ -222,6 +222,20 @@ yet.
 | M5 Dashboard & soak | Remaining panels, alert overlays, 7-day continuous run | Panels live with alert annotations; soak underway |
 | M6 Analysis & packaging | The written answer, demo capture | — |
 
+## The public dashboard
+
+`https://sky.gillu.me` — the pipeline, watchable: live map with dead-reckoned
+aircraft, per-field conditions, derived-event panels, the daily precision/recall
+scores, and the 38-year historical record. Interactive (timeframe + airport
+filters, shareable URLs) and honest by construction: unscored days render as
+gaps, and if the pipeline goes down the page says so and serves its last capture.
+
+The frontend (`web/`, Next.js) deploys on Vercel; it reads a GET-only FastAPI
+service (`api/`) on the droplet behind Caddy TLS at `api.sky.gillu.me` — the one
+deliberate exception to the loopback rule, backed by a SELECT-only database role.
+The API also pushes `live.json`/`history.json` snapshots to Vercel Blob, which
+the page falls back to automatically — so the dashboard outlives the droplet.
+
 ## Running it
 
 Prerequisites and full walkthroughs live in `docs/` (PDF operator guides:

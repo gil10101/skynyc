@@ -4,17 +4,29 @@
   "timezone": "utc",
   "refresh": "10s",
   "timepicker": {
-    "refresh_intervals": ["5s", "10s", "30s", "1m", "5m"]
+    "refresh_intervals": [
+      "5s",
+      "10s",
+      "30s",
+      "1m",
+      "5m"
+    ]
   },
   "schemaVersion": 39,
   "version": 2,
   "editable": false,
-  "time": { "from": "now-12h", "to": "now" },
+  "time": {
+    "from": "now-12h",
+    "to": "now"
+  },
   "annotations": {
     "list": [
       {
         "name": "NWS alerts",
-        "datasource": { "type": "postgres", "uid": "skynyc-pg" },
+        "datasource": {
+          "type": "postgres",
+          "uid": "skynyc-pg"
+        },
         "enable": true,
         "hide": false,
         "iconColor": "orange",
@@ -23,7 +35,14 @@
           "rawQuery": true,
           "rawSql": "SELECT effective_ts AS time, ends_ts AS timeend, airport || ': ' || event AS text, airport AS tags FROM weather_alerts WHERE effective_ts < $__timeTo() AND coalesce(ends_ts, now()) > $__timeFrom()"
         },
-        "filter": { "exclude": false, "ids": [5, 7, 9] }
+        "filter": {
+          "exclude": false,
+          "ids": [
+            5,
+            7,
+            9
+          ]
+        }
       }
     ]
   },
@@ -31,10 +50,18 @@
     {
       "id": 1,
       "title": "Live NYC airspace",
-      "description": "Airborne aircraft seen in the last 90 seconds, colored by barometric altitude (m). PRD §10 panel 1.",
+      "description": "Airborne aircraft seen in the last 90 seconds, colored by barometric altitude (m). PRD \u00a710 panel 1.",
       "type": "geomap",
-      "datasource": { "type": "postgres", "uid": "skynyc-pg" },
-      "gridPos": { "h": 16, "w": 15, "x": 0, "y": 0 },
+      "datasource": {
+        "type": "postgres",
+        "uid": "skynyc-pg"
+      },
+      "gridPos": {
+        "h": 16,
+        "w": 15,
+        "x": 0,
+        "y": 0
+      },
       "targets": [
         {
           "refId": "A",
@@ -48,22 +75,52 @@
         }
       ],
       "options": {
-        "view": { "id": "coords", "lat": 40.7, "lon": -73.95, "zoom": 8.5 },
-        "basemap": { "type": "default", "name": "Basemap" },
+        "view": {
+          "id": "coords",
+          "lat": 40.7,
+          "lon": -73.95,
+          "zoom": 8.5
+        },
+        "basemap": {
+          "type": "default",
+          "name": "Basemap"
+        },
         "layers": [
           {
             "type": "markers",
             "name": "Airports",
-            "filterData": { "id": "byRefId", "options": "B" },
-            "location": { "mode": "coords", "latitude": "a_lat", "longitude": "a_lon" },
+            "filterData": {
+              "id": "byRefId",
+              "options": "B"
+            },
+            "location": {
+              "mode": "coords",
+              "latitude": "a_lat",
+              "longitude": "a_lon"
+            },
             "config": {
               "style": {
-                "size": { "fixed": 10 },
-                "color": { "fixed": "orange" },
+                "size": {
+                  "fixed": 10
+                },
+                "color": {
+                  "fixed": "orange"
+                },
                 "fillOpacity": 1,
-                "symbol": { "mode": "fixed", "fixed": "img/icons/marker/x-mark.svg" },
-                "text": { "mode": "field", "field": "airport" },
-                "textConfig": { "fontSize": 13, "offsetY": -14, "textAlign": "center", "textBaseline": "middle" }
+                "symbol": {
+                  "mode": "fixed",
+                  "fixed": "img/icons/marker/x-mark.svg"
+                },
+                "text": {
+                  "mode": "field",
+                  "field": "airport"
+                },
+                "textConfig": {
+                  "fontSize": 13,
+                  "offsetY": -14,
+                  "textAlign": "center",
+                  "textBaseline": "middle"
+                }
               },
               "showLegend": false
             },
@@ -72,26 +129,52 @@
           {
             "type": "markers",
             "name": "Aircraft",
-            "location": { "mode": "coords", "latitude": "latitude", "longitude": "longitude" },
+            "location": {
+              "mode": "coords",
+              "latitude": "latitude",
+              "longitude": "longitude"
+            },
             "config": {
               "style": {
-                "size": { "fixed": 9 },
-                "color": { "field": "baro_alt_m" },
+                "size": {
+                  "fixed": 9
+                },
+                "color": {
+                  "field": "baro_alt_m"
+                },
                 "fillOpacity": 1,
-                "symbol": { "mode": "fixed", "fixed": "img/icons/marker/plane.svg" },
-                "symbolAlign": { "horizontal": "center", "vertical": "center" },
-                "rotation": { "mode": "field", "field": "track_deg", "fixed": 0, "min": -360, "max": 360 }
+                "symbol": {
+                  "mode": "fixed",
+                  "fixed": "img/icons/marker/plane.svg"
+                },
+                "symbolAlign": {
+                  "horizontal": "center",
+                  "vertical": "center"
+                },
+                "rotation": {
+                  "mode": "field",
+                  "field": "track_deg",
+                  "fixed": 0,
+                  "min": -360,
+                  "max": 360
+                }
               },
               "showLegend": true
             },
             "tooltip": true
           }
         ],
-        "controls": { "showZoom": true, "mouseWheelZoom": true, "showAttribution": true }
+        "controls": {
+          "showZoom": true,
+          "mouseWheelZoom": true,
+          "showAttribution": true
+        }
       },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "continuous-BlYlRd" },
+          "color": {
+            "mode": "continuous-BlYlRd"
+          },
           "min": 0,
           "max": 12000,
           "unit": "lengthm"
@@ -102,10 +185,18 @@
     {
       "id": 3,
       "title": "Current conditions",
-      "description": "Latest observation per station; flight_category is the operational summary. PRD §10 panel 3.",
+      "description": "Latest observation per station; flight_category is the operational summary. PRD \u00a710 panel 3.",
       "type": "table",
-      "datasource": { "type": "postgres", "uid": "skynyc-pg" },
-      "gridPos": { "h": 8, "w": 9, "x": 15, "y": 0 },
+      "datasource": {
+        "type": "postgres",
+        "uid": "skynyc-pg"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 9,
+        "x": 15,
+        "y": 0
+      },
       "targets": [
         {
           "refId": "A",
@@ -113,25 +204,54 @@
           "rawSql": "SELECT DISTINCT ON (station) station, obs_ts, text_desc, flight_category, wind_speed_kmh, wind_gust_kmh, visibility_m, ceiling_ft FROM weather_obs ORDER BY station, obs_ts DESC"
         }
       ],
-      "options": { "showHeader": true },
+      "options": {
+        "showHeader": true
+      },
       "fieldConfig": {
-        "defaults": { "custom": { "align": "auto" } },
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          }
+        },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "flight_category" },
+            "matcher": {
+              "id": "byName",
+              "options": "flight_category"
+            },
             "properties": [
               {
                 "id": "mappings",
                 "value": [
-                  { "type": "value", "options": {
-                    "VFR":  { "color": "semi-dark-green",       "index": 0 },
-                    "MVFR": { "color": "semi-dark-blue",        "index": 1 },
-                    "IFR":  { "color": "semi-dark-red",         "index": 2 },
-                    "LIFR": { "color": "semi-dark-purple", "index": 3 }
-                  } }
+                  {
+                    "type": "value",
+                    "options": {
+                      "VFR": {
+                        "color": "#0ca30c",
+                        "index": 0
+                      },
+                      "MVFR": {
+                        "color": "#3987e5",
+                        "index": 1
+                      },
+                      "IFR": {
+                        "color": "#e34948",
+                        "index": 2
+                      },
+                      "LIFR": {
+                        "color": "#9085e9",
+                        "index": 3
+                      }
+                    }
+                  }
                 ]
               },
-              { "id": "custom.cellOptions", "value": { "type": "color-background" } }
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              }
             ]
           }
         ]
@@ -140,10 +260,18 @@
     {
       "id": 4,
       "title": "Pipeline freshness",
-      "description": "Seconds since the newest live_states row — the end-to-end liveness signal (healthy < 90 s).",
+      "description": "Seconds since the newest live_states row \u2014 the end-to-end liveness signal (healthy < 90 s).",
       "type": "stat",
-      "datasource": { "type": "postgres", "uid": "skynyc-pg" },
-      "gridPos": { "h": 8, "w": 9, "x": 15, "y": 8 },
+      "datasource": {
+        "type": "postgres",
+        "uid": "skynyc-pg"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 9,
+        "x": 15,
+        "y": 8
+      },
       "targets": [
         {
           "refId": "A",
@@ -151,16 +279,32 @@
           "rawSql": "SELECT extract(epoch from now() - max(updated_at)) AS staleness_s FROM live_states"
         }
       ],
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "background"
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "s",
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "semi-dark-green", "value": null },
-              { "color": "semi-dark-yellow", "value": 90 },
-              { "color": "semi-dark-red", "value": 300 }
+              {
+                "color": "semi-dark-green",
+                "value": null
+              },
+              {
+                "color": "semi-dark-yellow",
+                "value": 90
+              },
+              {
+                "color": "semi-dark-red",
+                "value": 300
+              }
             ]
           }
         },
@@ -170,10 +314,18 @@
     {
       "id": 5,
       "title": "Arrivals per 15 min",
-      "description": "Detected arrivals bucketed to 15 minutes per airport; NWS alert windows overlay as annotations. PRD §10 panel 2.",
+      "description": "Detected arrivals bucketed to 15 minutes per airport; NWS alert windows overlay as annotations. PRD \u00a710 panel 2.",
       "type": "timeseries",
-      "datasource": { "type": "postgres", "uid": "skynyc-pg" },
-      "gridPos": { "h": 8, "w": 15, "x": 0, "y": 16 },
+      "datasource": {
+        "type": "postgres",
+        "uid": "skynyc-pg"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 15,
+        "x": 0,
+        "y": 16
+      },
       "targets": [
         {
           "refId": "A",
@@ -182,8 +334,15 @@
         }
       ],
       "options": {
-        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
-        "tooltip": { "mode": "multi", "sort": "desc" }
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
       },
       "fieldConfig": {
         "defaults": {
@@ -197,16 +356,70 @@
           "unit": "short",
           "min": 0
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/^.*(KJFK|JFK).*$/"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#3987e5"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/^.*(KLGA|LGA).*$/"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#d95926"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/^.*(KEWR|EWR).*$/"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#199e70"
+                }
+              }
+            ]
+          }
+        ]
       }
     },
     {
       "id": 6,
       "title": "NWS alert state by airport",
-      "description": "Every airport holds a row at all times; colored spans are alert windows, dark gaps are clear air. Concurrent alerts show the latest-starting one. PRD §10 panel 5.",
+      "description": "Every airport holds a row at all times; colored spans are alert windows, dark gaps are clear air. Concurrent alerts show the latest-starting one. PRD \u00a710 panel 5.",
       "type": "state-timeline",
-      "datasource": { "type": "postgres", "uid": "skynyc-pg" },
-      "gridPos": { "h": 8, "w": 9, "x": 15, "y": 16 },
+      "datasource": {
+        "type": "postgres",
+        "uid": "skynyc-pg"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 9,
+        "x": 15,
+        "y": 16
+      },
       "targets": [
         {
           "refId": "A",
@@ -215,33 +428,122 @@
         }
       ],
       "transformations": [
-        { "id": "partitionByValues", "options": { "fields": ["airport"], "keepFields": false } }
+        {
+          "id": "partitionByValues",
+          "options": {
+            "fields": [
+              "airport"
+            ],
+            "keepFields": false
+          }
+        }
       ],
       "options": {
         "mergeValues": true,
         "showValue": "auto",
         "rowHeight": 0.82,
-        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": false },
-        "tooltip": { "mode": "single" }
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "tooltip": {
+          "mode": "single"
+        }
       },
       "fieldConfig": {
         "defaults": {
-          "custom": { "fillOpacity": 72, "lineWidth": 0 },
+          "custom": {
+            "fillOpacity": 72,
+            "lineWidth": 0
+          },
           "mappings": [
-            { "type": "value", "options": { "clear": { "color": "rgba(120, 120, 130, 0.18)", "index": 0, "text": "clear" } } },
-            { "type": "special", "options": { "match": "null", "result": { "color": "transparent", "index": 1 } } }
+            {
+              "type": "value",
+              "options": {
+                "clear": {
+                  "color": "rgba(120, 120, 130, 0.18)",
+                  "index": 0,
+                  "text": "clear"
+                }
+              }
+            },
+            {
+              "type": "special",
+              "options": {
+                "match": "null",
+                "result": {
+                  "color": "transparent",
+                  "index": 1
+                }
+              }
+            }
           ]
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/^.*(KJFK|JFK).*$/"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#3987e5"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/^.*(KLGA|LGA).*$/"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#d95926"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/^.*(KEWR|EWR).*$/"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#199e70"
+                }
+              }
+            ]
+          }
+        ]
       }
     },
     {
       "id": 7,
       "title": "Airborne delay: holding minutes by airport, go-arounds",
-      "description": "Hourly holding minutes stacked by airport with go-arounds as points; alert windows overlay. Quiet hours are real zeros, not missing data. PRD §10 panel 4.",
+      "description": "Hourly holding minutes stacked by airport with go-arounds as points; alert windows overlay. Quiet hours are real zeros, not missing data. PRD \u00a710 panel 4.",
       "type": "timeseries",
-      "datasource": { "type": "postgres", "uid": "skynyc-pg" },
-      "gridPos": { "h": 8, "w": 15, "x": 0, "y": 24 },
+      "datasource": {
+        "type": "postgres",
+        "uid": "skynyc-pg"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 15,
+        "x": 0,
+        "y": 24
+      },
       "targets": [
         {
           "refId": "A",
@@ -255,8 +557,18 @@
         }
       ],
       "options": {
-        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true, "calcs": ["sum"] },
-        "tooltip": { "mode": "multi", "sort": "desc" }
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": [
+            "sum"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
       },
       "fieldConfig": {
         "defaults": {
@@ -265,7 +577,10 @@
             "fillOpacity": 78,
             "lineWidth": 0,
             "showPoints": "never",
-            "stacking": { "mode": "normal", "group": "holding" },
+            "stacking": {
+              "mode": "normal",
+              "group": "holding"
+            },
             "barAlignment": 0
           },
           "unit": "short",
@@ -273,25 +588,126 @@
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "KJFK" },
-            "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "semi-dark-yellow" } } ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "KLGA" },
-            "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "semi-dark-blue" } } ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "KEWR" },
-            "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "semi-dark-green" } } ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "go-arounds" },
+            "matcher": {
+              "id": "byName",
+              "options": "KJFK"
+            },
             "properties": [
-              { "id": "color", "value": { "mode": "fixed", "fixedColor": "semi-dark-red" } },
-              { "id": "custom.drawStyle", "value": "points" },
-              { "id": "custom.showPoints", "value": "always" },
-              { "id": "custom.pointSize", "value": 8 },
-              { "id": "custom.stacking", "value": { "mode": "none" } }
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "semi-dark-yellow"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "KLGA"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "semi-dark-blue"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "KEWR"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "semi-dark-green"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "go-arounds"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "semi-dark-red"
+                }
+              },
+              {
+                "id": "custom.drawStyle",
+                "value": "points"
+              },
+              {
+                "id": "custom.showPoints",
+                "value": "always"
+              },
+              {
+                "id": "custom.pointSize",
+                "value": 8
+              },
+              {
+                "id": "custom.stacking",
+                "value": {
+                  "mode": "none"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/^.*(KJFK|JFK).*$/"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#3987e5"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/^.*(KLGA|LGA).*$/"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#d95926"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/^.*(KEWR|EWR).*$/"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#199e70"
+                }
+              }
             ]
           }
         ]
@@ -300,10 +716,18 @@
     {
       "id": 8,
       "title": "Arrival rate vs effective wind",
-      "description": "Each point is one airport-hour: detected arrivals against effective wind (gust when reported, else sustained), colored by flight category. Visibility joins the story on the analytics dashboard, where 38 years give it range. PRD §10 panel 6.",
+      "description": "Each point is one airport-hour: detected arrivals against effective wind (gust when reported, else sustained), colored by flight category. Visibility joins the story on the analytics dashboard, where 38 years give it range. PRD \u00a710 panel 6.",
       "type": "xychart",
-      "datasource": { "type": "postgres", "uid": "skynyc-pg" },
-      "gridPos": { "h": 8, "w": 9, "x": 15, "y": 24 },
+      "datasource": {
+        "type": "postgres",
+        "uid": "skynyc-pg"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 9,
+        "x": 15,
+        "y": 24
+      },
       "timeFrom": "7d",
       "targets": [
         {
@@ -329,20 +753,135 @@
       ],
       "options": {
         "mapping": "auto",
-        "series": [{}],
-        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
-        "tooltip": { "mode": "single" }
+        "series": [
+          {}
+        ],
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single"
+        }
       },
       "fieldConfig": {
         "defaults": {
-          "custom": { "show": "points", "pointSize": { "fixed": 7 }, "fillOpacity": 65 },
+          "custom": {
+            "show": "points",
+            "pointSize": {
+              "fixed": 7
+            },
+            "fillOpacity": 65
+          },
           "unit": "short"
         },
         "overrides": [
-          { "matcher": { "id": "byFrameRefID", "options": "VFR" },  "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "semi-dark-green" } } ] },
-          { "matcher": { "id": "byFrameRefID", "options": "MVFR" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "semi-dark-blue" } } ] },
-          { "matcher": { "id": "byFrameRefID", "options": "IFR" },  "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "semi-dark-red" } } ] },
-          { "matcher": { "id": "byFrameRefID", "options": "LIFR" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "semi-dark-purple" } } ] }
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "VFR"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "semi-dark-green"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "MVFR"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "semi-dark-blue"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "IFR"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "semi-dark-red"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "LIFR"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "semi-dark-purple"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/^.*(KJFK|JFK).*$/"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#3987e5"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/^.*(KLGA|LGA).*$/"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#d95926"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/^.*(KEWR|EWR).*$/"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#199e70"
+                }
+              }
+            ]
+          }
         ]
       }
     },
@@ -351,8 +890,16 @@
       "title": "Wind by station",
       "description": "Sustained wind as lines, gusts as points, per station; alert windows overlay. The weather side of every activity panel above it.",
       "type": "timeseries",
-      "datasource": { "type": "postgres", "uid": "skynyc-pg" },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 32 },
+      "datasource": {
+        "type": "postgres",
+        "uid": "skynyc-pg"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 32
+      },
       "targets": [
         {
           "refId": "A",
@@ -366,8 +913,15 @@
         }
       ],
       "options": {
-        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
-        "tooltip": { "mode": "multi", "sort": "desc" }
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
       },
       "fieldConfig": {
         "defaults": {
@@ -382,17 +936,161 @@
           }
         },
         "overrides": [
-          { "matcher": { "id": "byName", "options": "KJFK" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "semi-dark-yellow" } } ] },
-          { "matcher": { "id": "byName", "options": "KLGA" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "semi-dark-blue" } } ] },
-          { "matcher": { "id": "byName", "options": "KEWR" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "semi-dark-green" } } ] },
-          { "matcher": { "id": "byRegexp", "options": ".* gust" }, "properties": [
-            { "id": "custom.drawStyle", "value": "points" },
-            { "id": "custom.showPoints", "value": "always" },
-            { "id": "custom.pointSize", "value": 5 }
-          ] },
-          { "matcher": { "id": "byName", "options": "KJFK gust" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "semi-dark-yellow" } } ] },
-          { "matcher": { "id": "byName", "options": "KLGA gust" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "semi-dark-blue" } } ] },
-          { "matcher": { "id": "byName", "options": "KEWR gust" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "semi-dark-green" } } ] }
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "KJFK"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "semi-dark-yellow"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "KLGA"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "semi-dark-blue"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "KEWR"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "semi-dark-green"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".* gust"
+            },
+            "properties": [
+              {
+                "id": "custom.drawStyle",
+                "value": "points"
+              },
+              {
+                "id": "custom.showPoints",
+                "value": "always"
+              },
+              {
+                "id": "custom.pointSize",
+                "value": 5
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "KJFK gust"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "semi-dark-yellow"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "KLGA gust"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "semi-dark-blue"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "KEWR gust"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "semi-dark-green"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/^.*(KJFK|JFK).*$/"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#3987e5"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/^.*(KLGA|LGA).*$/"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#d95926"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/^.*(KEWR|EWR).*$/"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#199e70"
+                }
+              }
+            ]
+          }
         ]
       }
     }
