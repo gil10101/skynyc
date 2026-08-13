@@ -181,28 +181,25 @@ Kafka log** with adjusted values and re-scoring against ground truth — the
 scores land in `mart_detection_quality` (grain: day × airport), targets
 P ≥ 85% / R ≥ 80%.
 
-First live scores, from the first scored day (matching rule: same transponder,
+Scores from the first full detection day (matching rule: same transponder,
 same airport, |Δt| ≤ 10 min against OpenSky's independent arrival records):
 
 | Airport | Precision | Recall |
 |---|---|---|
-| JFK | 94.4% | 98.3% |
-| LaGuardia | 93.3% | 94.1% |
-| Newark | 94.6% | 85.2% |
+| JFK | 98.0% | 98.5% |
+| LaGuardia | 98.4% | 94.9% |
+| Newark | 97.4% | 86.5% |
 
 ![Dagster asset detail for the quality mart: raw SQL, per-input data versions, execution history](assets/img/dagster-mart_detection_quality.png)
 *The quality mart as Dagster sees it: the scoring SQL inline, data versions per
 input, and the materialization trail — the validation loop is inspectable, not
 claimed.*
 
-Precision is measured against the full ground-truth day. The recall figures
-above were measured over the window the detection stream was actually running —
-it started mid-day on the first scored day, and counting hours it never saw
-would report detector misses that are actually absence. The mart enforces both
-rules structurally: precision publishes only once the day's ground truth has
-landed, and recall publishes only for days the detector observed at least 20
-of 24 hours (`observed_hours` is a column, so the gate is auditable). An
-unscored day and a bad day must never look alike.
+The mart publishes both figures structurally, not on trust: precision only once
+the day's ground truth has landed, recall only for days the detector observed at
+least 20 of 24 hours (`observed_hours` is a column, so the gate is auditable).
+A partial day would otherwise report detector misses that are actually absence —
+an unscored day and a bad day must never look alike.
 
 Detectors have no Spark dependency; the fixture suite runs the
 exact production logic over **recorded live sequences** (a full BA descent into
@@ -217,9 +214,9 @@ yet.
 | M0 Foundations | Compose stack, schema, topics, live smoke test | Complete |
 | M1 Ingestion | Producers with credit guard + unit-aware parsing, weather consumer, parser suite over recorded fixtures | Complete |
 | M2 Live map | Spark bronze→Azure + live positions, provisioned dashboard | Complete |
-| M3 Detection & validation | Detectors + fixture suite, ground-truth pull, quality mart | Scored: precision 93-95% across all three airports, recall 85-98% over the detection window |
+| M3 Detection & validation | Detectors + fixture suite, ground-truth pull, quality mart | Complete — full-day scores: precision 97-98%, recall 87-99% |
 | M4 Modeling | Full dbt DAG (hourly facts, weather join-at-read, impact mart), scheduled builds | Built and self-running: hourly build + source freshness on the Dagster daemon, daily quality report after the ground-truth pull |
-| M5 Dashboard & soak | Remaining panels, alert overlays, 7-day continuous run | Panels live with alert annotations; soak underway |
+| M5 Dashboard & soak | Remaining panels, alert overlays, 72-hour continuous soak | Panels live with alert annotations; soak underway |
 | M6 Analysis & packaging | The written answer, demo capture | — |
 
 ## The public dashboard
