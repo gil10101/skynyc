@@ -205,8 +205,41 @@ services:
       postgres:
         condition: service_healthy
 
+  # Public read-only API for sky.gillu.me (public-dashboard spec §3.2).
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    image: skynyc-api
+    container_name: skynyc-api
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      PG_RO_DSN: postgresql://skynyc_ro:${PG_RO_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-skynyc}
+      TZ: UTC
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Public TLS ingress for the API ONLY — the one deliberate exception to the
+  # loopback-bind rule (public-dashboard spec §3.3): the sky.gillu.me frontend
+  # must reach api.sky.gillu.me from browsers. Everything else stays 127.0.0.1.
+  caddy:
+    image: caddy:2.9
+    container_name: skynyc-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    depends_on:
+      - api
+
 volumes:
   kafkadata:
   pgdata:
   grafana-data:
   ivy-cache:
+  caddy-data:

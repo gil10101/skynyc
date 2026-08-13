@@ -63,8 +63,8 @@ echo "==> public api role + firewall"
   else echo 'PG_RO_PASSWORD unset — skipping role password'; fi"
 "${SSH[@]}" "$RSUDO ufw allow 80/tcp >/dev/null 2>&1; $RSUDO ufw allow 443/tcp >/dev/null 2>&1; true"
 
-echo "==> stream + batch"
-"${SSH[@]}" "cd $DEST && $RSUDO make stream && $RSUDO make batch"
+echo "==> stream + batch + public api"
+"${SSH[@]}" "cd $DEST && $RSUDO make stream && $RSUDO make batch && $RSUDO make api"
 
 echo "==> verify"
 "${SSH[@]}" "cd $DEST && $RSUDO docker compose ps --format 'table {{.Service}}\t{{.Status}}' \

@@ -9,7 +9,7 @@ PG_USER ?= skynyc
 PG_DB ?= skynyc
 
 .DEFAULT_GOAL := help
-.PHONY: help up down logs ps topics smoke psql ingest lag credits test stream batch dbt-build backup lake-backfill
+.PHONY: help up down logs ps topics smoke psql ingest lag credits test stream batch dbt-build backup lake-backfill api
 
 help:
 	@echo "SkyNYC targets:"
@@ -96,6 +96,11 @@ batch:
 dbt-build:
 	$(COMPOSE) exec -T dagster-webserver sh -c \
 	  "cd /app/dbt/skynyc_dbt && dbt deps --profiles-dir . -q && dbt build --profiles-dir ."
+
+# Public read-only API + its TLS ingress (the one non-loopback service).
+api:
+	$(COMPOSE) build api
+	$(COMPOSE) up -d api caddy
 
 # One-off manual backup; the nightly_backup schedule covers 03:30 ET once it is
 # toggled on in the UI (Manual 07).

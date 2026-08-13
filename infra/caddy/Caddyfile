@@ -1,0 +1,13 @@
+# The ONLY public ingress (public-dashboard spec §3.3). One vhost, one upstream;
+# every other host/IP hit on 80/443 is refused. TLS is automatic (Let's Encrypt)
+# once api.sky.gillu.me resolves to this box.
+api.sky.gillu.me {
+	encode gzip
+	header X-Robots-Tag "noindex"
+	reverse_proxy api:8000
+}
+
+# Bare-IP and unknown-host traffic: refuse loudly, no default page.
+http://, https:// {
+	respond 404
+}

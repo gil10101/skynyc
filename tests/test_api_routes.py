@@ -98,3 +98,23 @@ class TestSampler:
         monkeypatch.setattr(m.live, "live_snapshot", boom)
         asyncio.run(m.sampler_tick())  # must not raise
         assert m.app.state.latest_snapshot["generated_at"] == "prev"
+
+
+class TestSerialization:
+    def test_db_types_serialize(self, client, monkeypatch):
+        # Rows out of psycopg carry datetime/date/Decimal — a 500 here is the
+        # bug the first droplet smoke caught.
+        from datetime import datetime, timezone
+        from decimal import Decimal
+        monkeypatch.setattr(
+            m.live, "wind",
+            lambda hours: {"generated_at": "t", "series": [{
+                "obs_ts": datetime(2026, 8, 13, tzinfo=timezone.utc),
+                "wind_speed_kmh": Decimal("14.8"),
+            }]},
+        )
+        r = client.get("/v1/wind?hours=3")
+        assert r.status_code == 200
+        row = r.json()["series"][0]
+        assert row["obs_ts"].startswith("2026-08-13T")
+        assert row["wind_speed_kmh"] == 14.8

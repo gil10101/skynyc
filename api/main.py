@@ -13,6 +13,7 @@ import json
 import logging
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -74,8 +75,11 @@ def _run(fn, *args, **kwargs):
 
 
 def _cached(payload: dict, max_age: int) -> JSONResponse:
+    # jsonable_encoder: DB rows carry datetime/Decimal/date, which plain
+    # JSONResponse cannot serialize (datetimes -> ISO-8601, Decimal -> float).
     return JSONResponse(
-        payload, headers={"Cache-Control": f"public, max-age={max_age}"}
+        jsonable_encoder(payload),
+        headers={"Cache-Control": f"public, max-age={max_age}"},
     )
 
 
