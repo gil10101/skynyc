@@ -6,12 +6,12 @@
   "schemaVersion": 39,
   "version": 1,
   "editable": false,
-  "time": { "from": "1987-10-01T00:00:00Z", "to": "now" },
+  "time": { "from": "2000-01-01T00:00:00Z", "to": "now" },
   "panels": [
     {
       "id": 1,
-      "title": "Monthly arrival delay by flight category, 1987-present",
-      "description": "Each month contributes three points per category: the best day (min), the month's average, and the worst day (max) of daily average arrival delay, pooled across the three airports. Color is the day's worst observed flight category; point size grows min to max. Negative minimums are days that averaged early. Axis capped at four hours — a handful of extreme days sit above it and are ranked in the analytics dashboard's worst-days table. BTS serves no files for 1990-1999, hence the gap.",
+      "title": "Monthly arrival delay by flight category, 2000-present",
+      "description": "Each month contributes three points per category: the best day (min), the month's average, and the worst day (max) of daily average arrival delay, pooled across the three airports. Color is the day's worst observed flight category; point size grows min to max. Negative minimums are days that averaged early. Axis capped at four hours — a handful of extreme days sit above it and are ranked in the analytics dashboard's worst-days table. The view starts at 2000, where source coverage becomes continuous (BTS serves nothing for 1990-1999).",
       "type": "timeseries",
       "datasource": { "type": "postgres", "uid": "skynyc-pg" },
       "gridPos": { "h": 18, "w": 24, "x": 0, "y": 0 },
