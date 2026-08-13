@@ -1,0 +1,65 @@
+{
+  "uid": "skynyc-delay-history",
+  "title": "SkyNYC Delay History",
+  "timezone": "utc",
+  "refresh": "",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": false,
+  "time": { "from": "1987-10-01T00:00:00Z", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Monthly arrival delay by flight category, 1987-present",
+      "description": "Each month contributes three points per category: the best day (min), the month's average, and the worst day (max) of daily average arrival delay, pooled across the three airports. Color is the day's worst observed flight category; point size grows min to max. Negative minimums are days that averaged early. Axis capped at four hours — a handful of extreme days sit above it and are ranked in the analytics dashboard's worst-days table. BTS serves no files for 1990-1999, hence the gap.",
+      "type": "timeseries",
+      "datasource": { "type": "postgres", "uid": "skynyc-pg" },
+      "gridPos": { "h": 18, "w": 24, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "time_series",
+          "rawSql": "SELECT date_trunc('month', flight_date) AS time, worst_category || ' max' AS metric, round(max(avg_arr_delay_min)::numeric, 1) AS value FROM gold_airport_day_delay WHERE worst_category IS NOT NULL AND avg_arr_delay_min IS NOT NULL GROUP BY 1, worst_category ORDER BY 1"
+        },
+        {
+          "refId": "B",
+          "format": "time_series",
+          "rawSql": "SELECT date_trunc('month', flight_date) AS time, worst_category || ' avg' AS metric, round(avg(avg_arr_delay_min)::numeric, 1) AS value FROM gold_airport_day_delay WHERE worst_category IS NOT NULL AND avg_arr_delay_min IS NOT NULL GROUP BY 1, worst_category ORDER BY 1"
+        },
+        {
+          "refId": "C",
+          "format": "time_series",
+          "rawSql": "SELECT date_trunc('month', flight_date) AS time, worst_category || ' min' AS metric, round(min(avg_arr_delay_min)::numeric, 1) AS value FROM gold_airport_day_delay WHERE worst_category IS NOT NULL AND avg_arr_delay_min IS NOT NULL GROUP BY 1, worst_category ORDER BY 1"
+        }
+      ],
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": false },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "m",
+          "min": -15,
+          "max": 240,
+          "custom": {
+            "drawStyle": "points",
+            "showPoints": "always",
+            "pointSize": 4,
+            "fillOpacity": 55,
+            "lineWidth": 0,
+            "spanNulls": false
+          }
+        },
+        "overrides": [
+          { "matcher": { "id": "byRegexp", "options": "^VFR.*" },  "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "semi-dark-green" } } ] },
+          { "matcher": { "id": "byRegexp", "options": "^MVFR.*" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "semi-dark-blue" } } ] },
+          { "matcher": { "id": "byRegexp", "options": "^IFR.*" },  "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "semi-dark-red" } } ] },
+          { "matcher": { "id": "byRegexp", "options": "^LIFR.*" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "semi-dark-purple" } } ] },
+          { "matcher": { "id": "byRegexp", "options": ".* max$" }, "properties": [ { "id": "custom.pointSize", "value": 5 } ] },
+          { "matcher": { "id": "byRegexp", "options": ".* avg$" }, "properties": [ { "id": "custom.pointSize", "value": 3 } ] },
+          { "matcher": { "id": "byRegexp", "options": ".* min$" }, "properties": [ { "id": "custom.pointSize", "value": 2 }, { "id": "custom.fillOpacity", "value": 30 } ] }
+        ]
+      }
+    }
+  ]
+}
