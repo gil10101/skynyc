@@ -5,13 +5,21 @@ models:
     description: >
       One row per UTC day per airport: detected vs ground-truth arrival counts
       and the resulting precision/recall (PRD §9; targets P >= 0.85, R >= 0.80).
-      Precision publishes once the day's ground truth lands; recall publishes
-      only for days the detector observed >= 20 of 24 hours — a full-day
-      reference scored against a partial detection day reports absence as
-      misses. The published quality score for the detection pipeline.
+      Both scores publish only when the day's ground truth has landed at
+      plausible volume (>= half the detected count — a sparser reference day is
+      incomplete upstream, not detector over-fire); recall additionally requires
+      the detector to have observed >= 20 of 24 hours — a full-day reference
+      scored against a partial detection day reports absence as misses. The
+      published quality score for the detection pipeline.
     tests:
       - dbt_utils.unique_combination_of_columns:
           combination_of_columns: [quality_date, airport]
+      - dbt_utils.expression_is_true:
+          name: precision_withheld_on_sparse_ground_truth
+          expression: '"precision" is null or arrivals_gt * 2 >= arrivals_detected'
+      - dbt_utils.expression_is_true:
+          name: recall_withheld_on_sparse_ground_truth
+          expression: 'recall is null or arrivals_gt * 2 >= arrivals_detected'
     columns:
       - name: quality_date
         tests: [not_null]

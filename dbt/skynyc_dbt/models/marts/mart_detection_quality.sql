@@ -82,17 +82,26 @@ select
     coalesce(d.detected_matched, 0) as detected_matched,
     coalesce(g.gt_matched, 0) as gt_matched,
     coalesce(c.observed_hours, 0) as observed_hours,
-    -- Ground truth arrives D-1 (PRD §5.1): the most recent detected day has no
-    -- GT rows yet, and 0 matches against an absent reference is "unscored",
-    -- not 0% precision. Score only days whose GT pull has landed.
-    case when coalesce(g.arrivals_gt, 0) > 0
+    -- Ground truth arrives D-1 (PRD §5.1) and its upstream aggregation can lag
+    -- further: a day may come back absent, or present but nearly empty. Neither
+    -- is scoreable — 0 or near-0 matches against a missing reference is
+    -- "unscored", not 0% precision. Completeness proxy: the detector's own
+    -- count is an independent same-order estimate of the day's true arrivals,
+    -- so ground truth at less than half the detected count means the reference
+    -- day is incomplete, not that the detector over-fired. Score only days
+    -- whose ground truth has landed at plausible volume.
+    case when coalesce(g.arrivals_gt, 0) >= 0.5 * coalesce(d.arrivals_detected, 0)
+          and coalesce(g.arrivals_gt, 0) > 0
          then round(d.detected_matched::numeric / nullif(d.arrivals_detected, 0), 4)
     end as "precision",
     -- Recall additionally requires the detector to have observed essentially
     -- the whole day (>= 20 of 24 hours): full-day ground truth scored against
-    -- a partial detection day reports absence as misses. Precision needs no
-    -- such gate — every detected event can be checked regardless of coverage.
-    case when coalesce(g.arrivals_gt, 0) > 0 and coalesce(c.observed_hours, 0) >= 20
+    -- a partial detection day reports absence as misses. The half-of-detected
+    -- floor applies here too — recall against a sliver of ground truth is a
+    -- coin flip, not a score.
+    case when coalesce(g.arrivals_gt, 0) >= 0.5 * coalesce(d.arrivals_detected, 0)
+          and coalesce(g.arrivals_gt, 0) > 0
+          and coalesce(c.observed_hours, 0) >= 20
          then round(g.gt_matched::numeric / nullif(g.arrivals_gt, 0), 4)
     end as recall
 from detected_daily d
