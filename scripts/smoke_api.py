@@ -76,7 +76,8 @@ def main() -> int:
 
     # SSE: first event within ~15 s
     try:
-        request = urllib.request.Request(BASE + "/v1/stream", headers={"Accept": "text/event-stream"})
+        headers = {"Accept": "text/event-stream"}
+        request = urllib.request.Request(BASE + "/v1/stream", headers=headers)
         with urllib.request.urlopen(request, timeout=20) as response:
             chunk = response.read(20)
             ok = chunk.startswith(b"event:")

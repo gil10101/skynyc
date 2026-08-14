@@ -14,13 +14,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      # The unit tests cover the detector engine and API parsers, which need only
-      # pydantic and pytest. The heavier pins in requirements.txt (confluent-kafka,
-      # psycopg) pull in system libraries and are exercised by the deployed stack,
-      # not by these tests — installing them here would slow CI for no coverage
-      # gain. Versions match requirements.txt / requirements-dev.txt.
+      # Detector/parser tests need only pydantic and pytest; the API tests import
+      # api/* at collection time, so the public-API pins (fastapi, psycopg[binary],
+      # requests — all wheels, no system libraries) come along, plus httpx for
+      # fastapi.testclient. The heavier requirements.txt pins (confluent-kafka)
+      # stay out: they are exercised by the deployed stack, not by these tests.
       - name: Install test dependencies
-        run: pip install pydantic==2.9.2 pytest==8.3.3
+        run: pip install -r requirements-api.txt httpx==0.28.1 pydantic==2.9.2 pytest==8.3.3
       - name: Run tests
         run: python3 -m pytest tests/ -q
 
