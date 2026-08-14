@@ -186,9 +186,9 @@ same airport, |Δt| ≤ 10 min against OpenSky's independent arrival records):
 
 | Airport | Precision | Recall |
 |---|---|---|
-| JFK | 98.0% | 98.5% |
-| LaGuardia | 98.4% | 94.9% |
-| Newark | 97.4% | 86.5% |
+| JFK | 98.8% | 98.5% |
+| LaGuardia | 99.1% | 95.0% |
+| Newark | 98.1% | 86.1% |
 
 ![Dagster asset detail for the quality mart: raw SQL, per-input data versions, execution history](assets/img/dagster-mart_detection_quality.png)
 *The quality mart as Dagster sees it: the scoring SQL inline, data versions per
