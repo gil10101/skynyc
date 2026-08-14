@@ -500,7 +500,7 @@
     {
       "id": 5,
       "title": "Detector precision and recall by day",
-      "description": "The validation loop, published daily: detected arrivals matched against OpenSky ground truth per airport (same aircraft, same airport, within 10 minutes). Reference lines at the P 0.85 / R 0.80 targets.",
+      "description": "The validation loop, published daily: detected arrivals matched against OpenSky ground truth per airport (same aircraft, same airport, within 10 minutes). Reference lines at the P 0.85 / R 0.80 targets. Gaps are unscored days \u2014 ground truth absent or below plausible volume, or the detector observed under 20 of 24 hours; an unscored day is withheld, never shown as 0%.",
       "type": "timeseries",
       "datasource": {
         "type": "postgres",
@@ -516,12 +516,12 @@
         {
           "refId": "A",
           "format": "time_series",
-          "rawSql": "SELECT quality_date::timestamptz AS time, airport || ' precision' AS metric, \"precision\" AS value FROM analytics.mart_detection_quality WHERE \"precision\" IS NOT NULL ORDER BY 1"
+          "rawSql": "SELECT quality_date::timestamptz AS time, airport || ' precision' AS metric, \"precision\" AS value FROM analytics.mart_detection_quality ORDER BY 1"
         },
         {
           "refId": "B",
           "format": "time_series",
-          "rawSql": "SELECT quality_date::timestamptz AS time, airport || ' recall' AS metric, recall AS value FROM analytics.mart_detection_quality WHERE \"precision\" IS NOT NULL ORDER BY 1"
+          "rawSql": "SELECT quality_date::timestamptz AS time, airport || ' recall' AS metric, recall AS value FROM analytics.mart_detection_quality ORDER BY 1"
         }
       ],
       "options": {
@@ -545,7 +545,7 @@
             "lineWidth": 2,
             "showPoints": "always",
             "pointSize": 6,
-            "spanNulls": true,
+            "spanNulls": false,
             "thresholdsStyle": {
               "mode": "line"
             }
