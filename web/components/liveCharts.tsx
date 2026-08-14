@@ -154,6 +154,9 @@ export function WindScatter({ filters }: { filters: Filters }) {
           <YAxis dataKey="arrivals_detected" type="number" name="arrivals/h" allowDecimals={false} />
           <Tooltip
             {...tooltipStyle(P)}
+            // scatter series has no fill (Cells carry it), so recharts' default
+            // item color falls back to #000 — invisible on the dark tooltip
+            itemStyle={{ padding: 0, color: P.tooltipText }}
             formatter={(value, name) => [String(value), name === "arrivals_detected" ? "arrivals/h" : "wind km/h"]}
           />
           <Scatter data={points}>

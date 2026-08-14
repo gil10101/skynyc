@@ -233,15 +233,13 @@ function ThemedMap({ theme, live, paused }: { theme: Theme; live: Live; paused: 
     return () => cancelAnimationFrame(frame);
   }, []);
 
-  // hover picking
+  // hover picking — on map events, not the overlay canvas: the overlay is
+  // pointer-events:none so wheel zoom / drag pan reach the map underneath
   useEffect(() => {
-    const canvas = canvasRef.current;
     const map = mapRef.current;
-    if (!canvas || !map) return;
-    const onMove = (event: MouseEvent) => {
-      const rect = canvas.getBoundingClientRect();
-      const x = event.clientX - rect.left;
-      const y = event.clientY - rect.top;
+    if (!map) return;
+    const onMove = (event: maplibregl.MapMouseEvent) => {
+      const { x, y } = event.point;
       let best: Hover | null = null;
       let bestD = 14;
       for (const p of positionsRef.current.list) {
@@ -255,11 +253,13 @@ function ThemedMap({ theme, live, paused }: { theme: Theme; live: Live; paused: 
       setHover(best);
     };
     const onLeave = () => setHover(null);
-    canvas.addEventListener("mousemove", onMove);
-    canvas.addEventListener("mouseleave", onLeave);
+    map.on("mousemove", onMove);
+    map.on("mouseout", onLeave);
+    map.on("movestart", onLeave); // stale tooltip mid-pan/zoom reads as a bug
     return () => {
-      canvas.removeEventListener("mousemove", onMove);
-      canvas.removeEventListener("mouseleave", onLeave);
+      map.off("mousemove", onMove);
+      map.off("mouseout", onLeave);
+      map.off("movestart", onLeave);
     };
   }, []);
 
@@ -271,7 +271,7 @@ function ThemedMap({ theme, live, paused }: { theme: Theme; live: Live; paused: 
       style={{ height: "68vh", minHeight: 440 }}
     >
       <div ref={containerRef} style={{ position: "absolute", inset: 0 }} />
-      <canvas ref={canvasRef} style={{ position: "absolute", inset: 0 }} />
+      <canvas ref={canvasRef} style={{ position: "absolute", inset: 0, pointerEvents: "none" }} />
 
       {hover && (
         <div

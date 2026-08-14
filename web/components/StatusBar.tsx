@@ -4,7 +4,7 @@
  *  arrow-swap hover — plus the breathing LIVE indicator (re-keyed per real
  *  data tick) and the honesty banner when the pipeline degrades (spec §4). */
 
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Pause, Play } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { Live } from "@/lib/useLive";
 
@@ -51,9 +51,7 @@ export default function StatusBar({ live, paused, onPause }: {
           </span>
           portfolio
         </a>
-        <div className="hidden text-sm text-muted md:block">
-          skynyc — weather impact on NYC arrivals, measured live
-        </div>
+        <div className="hidden text-sm text-muted md:block">SkyNYC</div>
         <div className="ml-auto flex items-center gap-3">
           <span className="flex items-center gap-2 font-mono text-[11.5px] text-ink-2">
             <span key={live.tick} className="pulse-tick relative flex h-2.5 w-2.5">
@@ -65,16 +63,28 @@ export default function StatusBar({ live, paused, onPause }: {
           </span>
           <button
             onClick={() => onPause(!paused)}
-            className="rounded-lg border border-border px-2.5 py-1 font-mono text-[10.5px] text-ink-2 transition-colors hover:bg-secondary"
+            className="rounded-lg border border-border p-1.5 text-ink-2 transition-colors hover:bg-secondary"
             aria-pressed={paused}
+            aria-label={paused ? "resume motion" : "pause motion"}
+            title={paused ? "resume motion" : "pause motion"}
           >
-            {paused ? "resume motion" : "pause motion"}
+            {paused ? <Play className="size-3.5" /> : <Pause className="size-3.5" />}
           </button>
           <a
             href="https://github.com/gil10101/skynyc"
-            className="hidden rounded-lg border border-border px-2.5 py-1 font-mono text-[10.5px] text-ink-2 transition-colors hover:bg-secondary sm:block"
+            className="hidden rounded-lg border border-border p-1.5 text-ink-2 transition-colors hover:bg-secondary sm:block"
+            aria-label="source on GitHub"
+            title="source on GitHub"
           >
-            source
+            {/* single-file mark: masked with currentColor so it follows the theme */}
+            <span
+              aria-hidden="true"
+              className="block size-3.5 bg-current"
+              style={{
+                WebkitMask: "url(/brand/github.svg) center / contain no-repeat",
+                mask: "url(/brand/github.svg) center / contain no-repeat",
+              }}
+            />
           </a>
         </div>
       </div>

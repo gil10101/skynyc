@@ -38,8 +38,8 @@ function Dashboard() {
       <LiveMap live={live} paused={paused} />
 
       <Reveal><Section
-        eyebrow="NOW · LIVE OPERATIONS"
-        title="What the three fields are doing right now"
+        eyebrow="NOW · ARRIVALS & CONDITIONS"
+        title="Traffic and weather on the three fields"
         note="Positions poll every 30 seconds from ADS-B; weather every 5 minutes from NWS stations on each field. Every panel below derives from those two feeds — nothing is read from a delay product."
       >
         <div className="mb-4">
@@ -105,7 +105,7 @@ function Dashboard() {
           <div className="flex flex-col gap-1.5 font-mono text-[11px]">
             <a className="text-ink-2 transition-colors hover:text-accent" href="https://github.com/gil10101/skynyc">github.com/gil10101/skynyc</a>
             <a className="text-ink-2 transition-colors hover:text-accent" href="https://gillu.me">gillu.me</a>
-            <span className="text-[11px] text-muted/70">last updated 08-13-2026</span>
+            <span className="text-[11px] text-muted/70">last updated 08-14-2026</span>
           </div>
         </div>
       </footer>

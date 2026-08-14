@@ -23,7 +23,7 @@ test("sections render and a mocked tick applies", async ({ page }) => {
     }),
   );
   await page.goto("/");
-  await expect(page.getByText("NOW · LIVE OPERATIONS")).toBeVisible();
+  await expect(page.getByText("NOW · ARRIVALS & CONDITIONS")).toBeVisible();
   await expect(page.getByText("PROOF · THE VALIDATION LOOP")).toBeVisible();
   await expect(page.getByText("RECORD · 38 YEARS OF WEATHER COST")).toBeVisible();
   await expect(page.getByText(/LIVE/).first()).toBeVisible();
