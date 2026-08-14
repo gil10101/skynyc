@@ -8,6 +8,12 @@ local dev must never fail on missing cloud config).
 
 live.json    — every LIVE_INTERVAL_S, snapshot + status
 history.json — at startup and daily at HISTORY_HOUR_UTC
+
+Cadence is budget-bound: every PUT is a Vercel Blob "advanced operation" and
+the free tier includes 2,000/month. At 60 s the live publisher alone burned
+~1,440/day; hourly keeps the whole publisher near ~800/month. The blob is
+only ever read in frozen mode (API unreachable), where an up-to-an-hour-old
+capture is honest — the banner timestamps it.
 """
 
 from __future__ import annotations
@@ -26,7 +32,7 @@ from api import queries_live as live
 log = logging.getLogger("api.blob")
 
 BLOB_ENDPOINT = "https://blob.vercel-storage.com"
-LIVE_INTERVAL_S = 60
+LIVE_INTERVAL_S = 3600
 HISTORY_HOUR_UTC = 6  # 06:10Z, after the nightly batch world has settled
 TIMEOUT_S = 10
 
