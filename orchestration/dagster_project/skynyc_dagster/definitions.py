@@ -25,10 +25,11 @@ from dagster import (
     AssetSelection,
     DailyPartitionsDefinition,
     Definitions,
+    RunRequest,
     ScheduleDefinition,
     asset,
     define_asset_job,
-    build_schedule_from_partitioned_job,
+    schedule,
 )
 from dagster_dbt import DbtCliResource, dbt_assets
 
@@ -115,11 +116,25 @@ ground_truth_job = define_asset_job(
     "ground_truth_job", selection=[ground_truth_arrivals], partitions_def=daily_partitions
 )
 
-# 09:15 ET daily for the previous day (PRD §9) — timezone comes from the
-# partitions definition. Ships off; toggle in the UI.
-daily_ground_truth = build_schedule_from_partitioned_job(
-    ground_truth_job, name="daily_ground_truth", hour_of_day=9, minute_of_hour=15,
+# 09:15 ET daily, pulling a three-day window (D-1 through D-3), not just
+# yesterday: the upstream arrivals feed is built by a nightly aggregation that
+# can finish hours-to-days late, so a day pulled once at D-1 may be nearly
+# empty and would otherwise stay that way forever. Re-pulling the window heals
+# late data automatically — the upsert is idempotent, and the cost is
+# 3 days x 3 airports x 4 credits = 36/day of the 4,000 flights bucket
+# (PRD §2.3). The quality mart withholds scores until a day's ground truth
+# reaches plausible volume, so a still-lagging day reads "unscored", never 0%.
+@schedule(
+    job=ground_truth_job,
+    cron_schedule="15 9 * * *",
+    execution_timezone="America/New_York",
+    name="daily_ground_truth",
 )
+def daily_ground_truth(context):  # noqa: ANN001, ANN201 — dagster context/yield types
+    fire_date = context.scheduled_execution_time.date()
+    for days_back in (1, 2, 3):
+        key = (fire_date - timedelta(days=days_back)).strftime("%Y-%m-%d")
+        yield RunRequest(run_key=f"{fire_date}:{key}", partition_key=key)
 
 BACKUP_CONTAINER = "backups"
 
