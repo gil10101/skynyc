@@ -89,17 +89,18 @@ export function QualityChart({ filters }: { filters: Filters }) {
           <XAxis dataKey="date" />
           <YAxis domain={[0, 1]} tickFormatter={(v) => `${Math.round(v * 100)}%`} />
           <Tooltip {...tooltipStyle(P)} formatter={(v) => (v == null ? "—" : `${(Number(v) * 100).toFixed(1)}%`)} />
-          <Legend
-            formatter={(v: string) => `${AIRPORT_LABEL[v.slice(0, 4)]} ${v.endsWith("_p") ? "precision" : "recall"}`}
-            wrapperStyle={{ fontSize: 11 }}
-          />
+          <Legend wrapperStyle={{ fontSize: 11 }} />
           <ReferenceLine y={0.85} stroke={P.neutral} strokeDasharray="2 4" />
           <ReferenceLine y={0.8} stroke={P.faint} strokeDasharray="2 4" />
           {AIRPORT_ORDER.filter((a) => filters.airports.includes(a)).map((a) => (
-            <Line key={`${a}_p`} dataKey={`${a}_p`} stroke={P.airport[a]} strokeWidth={2} connectNulls={false} />
+            // name feeds both legend and tooltip — without it the tooltip
+            // shows the raw dataKey ("KJFK_p").
+            <Line key={`${a}_p`} dataKey={`${a}_p`} name={`${AIRPORT_LABEL[a]} precision`}
+              stroke={P.airport[a]} strokeWidth={2} connectNulls={false} />
           ))}
           {AIRPORT_ORDER.filter((a) => filters.airports.includes(a)).map((a) => (
-            <Line key={`${a}_r`} dataKey={`${a}_r`} stroke={P.airport[a]} strokeWidth={1.25} strokeDasharray="4 4" connectNulls={false} />
+            <Line key={`${a}_r`} dataKey={`${a}_r`} name={`${AIRPORT_LABEL[a]} recall`}
+              stroke={P.airport[a]} strokeWidth={1.25} strokeDasharray="4 4" connectNulls={false} />
           ))}
         </LineChart>
       </ResponsiveContainer>

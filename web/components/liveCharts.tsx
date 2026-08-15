@@ -90,7 +90,21 @@ export function AirborneChart({ filters }: { filters: Filters }) {
   for (const entry of data) {
     const g = goArounds.filter((r) => r.bucket_ts === entry.ts)
       .reduce((n, r) => n + r.go_arounds, 0);
-    if (g > 0) entry.go_arounds = g;
+    // The y-axis is minutes; a count plotted on it reads as a duration. The
+    // marker pins to the baseline (position = when), the tooltip carries the count.
+    if (g > 0) { entry.go_arounds = g; entry.go_around_marker = 0; }
+  }
+  // The x-axis is categorical, so hours with no events vanish and 16:00 lands
+  // beside 08:00 — adjacent bars implying adjacent hours. Fill the quiet hours
+  // between the first and last bucket so spacing is time.
+  const byEpoch = new Map(data.map((d) => [new Date(String(d.ts)).getTime(), d]));
+  const filled: typeof data = [];
+  if (data.length > 0) {
+    const start = new Date(String(data[0].ts)).getTime();
+    const end = new Date(String(data[data.length - 1].ts)).getTime();
+    for (let t = start; t <= end; t += 3_600_000) {
+      filled.push(byEpoch.get(t) ?? { ts: new Date(t).toISOString() });
+    }
   }
   return (
     <ChartCard
@@ -99,16 +113,23 @@ export function AirborneChart({ filters }: { filters: Filters }) {
       state={q.state}
     >
       <ResponsiveContainer>
-        <ComposedChart data={data} margin={{ top: 4, right: 8, left: -18, bottom: 0 }}>
+        <ComposedChart data={filled} margin={{ top: 4, right: 8, left: -18, bottom: 0 }}>
           <CartesianGrid vertical={false} />
           <XAxis dataKey="ts" tickFormatter={(v) => shortTime(v, filters.hours)} minTickGap={40} />
           <YAxis allowDecimals={false} />
-          <Tooltip {...tooltipStyle(P)} labelFormatter={(v) => new Date(String(v)).toLocaleString()} />
-          <Legend formatter={(v) => (v === "go_arounds" ? "go-arounds" : AIRPORT_LABEL[v] ?? v)} wrapperStyle={{ fontSize: 11.5 }} />
+          <Tooltip
+            {...tooltipStyle(P)}
+            labelFormatter={(v) => new Date(String(v)).toLocaleString()}
+            formatter={(value, name, item) =>
+              name === "go_around_marker"
+                ? [String((item as { payload?: Record<string, unknown> }).payload?.go_arounds ?? value), "go-arounds"]
+                : [`${value} min`, AIRPORT_LABEL[String(name)] ?? String(name)]}
+          />
+          <Legend formatter={(v) => (v === "go_around_marker" ? "go-arounds" : AIRPORT_LABEL[v] ?? v)} wrapperStyle={{ fontSize: 11.5 }} />
           {AIRPORT_ORDER.filter((a) => filters.airports.includes(a)).map((a) => (
             <Bar key={a} dataKey={a} stackId="hold" fill={P.airport[a]} />
           ))}
-          <Scatter dataKey="go_arounds" fill={P.eventType.go_around} shape="circle" />
+          <Scatter dataKey="go_around_marker" fill={P.eventType.go_around} shape="circle" />
         </ComposedChart>
       </ResponsiveContainer>
     </ChartCard>
@@ -163,10 +184,14 @@ export function WindScatter({ filters }: { filters: Filters }) {
   const P = usePaletteOrDark();
   const q = useData<{ points: ScatterPoint[] }>("/v1/scatter", { days: 7 }, undefined);
   const points = (q.data?.points ?? []).filter((p) => filters.airports.includes(p.airport));
+  // A calm week is all one category — say so, or uniform color reads as a bug.
+  const categories = [...new Set(points.map((p) => p.flight_category).filter(Boolean))] as string[];
   return (
     <ChartCard
       title="Arrival rate vs effective wind"
-      sub="hourly points, last 7 days · color = flight category at that hour"
+      sub={categories.length === 1
+        ? `hourly points, last 7 days · every hour was ${categories[0]}`
+        : "hourly points, last 7 days · color = flight category at that hour"}
       state={q.state}
     >
       <ResponsiveContainer>
@@ -179,8 +204,26 @@ export function WindScatter({ filters }: { filters: Filters }) {
             // scatter series has no fill (Cells carry it), so recharts' default
             // item color falls back to #000 — invisible on the dark tooltip
             itemStyle={{ padding: 0, color: P.tooltipText }}
-            formatter={(value, name) => [String(value), name === "arrivals_detected" ? "arrivals/h" : "wind km/h"]}
+            // recharts hands the AXIS name here, not the dataKey; the axis unit
+            // is appended after this formatter, so the value stays bare.
+            formatter={(value, name) =>
+              name === "arrivals/h" ? [String(value), "arrivals/h"] : [String(value), "wind"]}
           />
+          {categories.length > 1 && (
+            <Legend content={() => (
+              <div style={{ display: "flex", gap: 12, justifyContent: "center", fontSize: 11.5 }}>
+                {categories.map((c) => (
+                  <span key={c} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                    <span style={{
+                      width: 8, height: 8, borderRadius: 4, display: "inline-block",
+                      background: P.category[c] ?? P.neutral,
+                    }} />
+                    {c}
+                  </span>
+                ))}
+              </div>
+            )} />
+          )}
           <Scatter data={points}>
             {points.map((p, i) => (
               <Cell key={i} fill={p.flight_category ? (P.category[p.flight_category] ?? P.neutral) : P.neutral} />
