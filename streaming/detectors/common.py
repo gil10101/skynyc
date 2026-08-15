@@ -37,20 +37,32 @@ class Sample:
     callsign: str | None
 
 
+def _null(value: float | None) -> float | None:
+    """Missing measurement -> None. The Spark bridge delivers pandas records,
+    where every null float arrives as NaN — which slips `is None` guards and
+    compares False against every threshold, so it would walk through detector
+    gates and poison the details JSON at the sink (ground rule 4). One nullable
+    contract for both paths: NaN is null."""
+    if value is None or (isinstance(value, float) and math.isnan(value)):
+        return None
+    return value
+
+
 def from_message(message: dict) -> Sample | None:
     """Envelope dict -> Sample; None when the position is missing."""
-    if message.get("lat") is None or message.get("lon") is None:
+    lat, lon = _null(message.get("lat")), _null(message.get("lon"))
+    if lat is None or lon is None:
         return None
     return Sample(
         ts=int(message["api_ts"]),
-        lat=float(message["lat"]),
-        lon=float(message["lon"]),
-        alt=message.get("baro_alt_m"),
-        vel=message.get("velocity_ms"),
-        track=message.get("track_deg"),
-        vrate=message.get("vrate_ms"),
-        on_ground=bool(message.get("on_ground")),
-        category=message.get("category"),
+        lat=float(lat),
+        lon=float(lon),
+        alt=_null(message.get("baro_alt_m")),
+        vel=_null(message.get("velocity_ms")),
+        track=_null(message.get("track_deg")),
+        vrate=_null(message.get("vrate_ms")),
+        on_ground=bool(_null(message.get("on_ground"))),
+        category=_null(message.get("category")),
         callsign=(message.get("callsign") or None),
     )
 

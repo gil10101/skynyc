@@ -232,6 +232,49 @@ class TestStateHygiene:
         assert state is None
 
 
+class TestNaNBoundary:
+    # The Spark bridge hands the engine pandas records, where every null float
+    # arrives as NaN, not None. NaN slips `is None` guards and every comparison
+    # against it is False, so an unknown altitude walked through the coverage-
+    # loss gate and NaN-poisoned the details JSON at the Postgres sink
+    # (2026-08-14 outage). Real sequence: N69F vanished 2.9 km from JFK with
+    # its last ten altitudes null.
+
+    @staticmethod
+    def as_pandas_records(messages: list[dict]) -> list[dict]:
+        # DOCUMENTED MUTATION of recorded data: nulls become NaN, exactly the
+        # transform pdf.to_dict("records") applies at the Spark bridge.
+        return [
+            {k: (float("nan") if v is None and k != "callsign" else v)
+             for k, v in m.items()}
+            for m in messages
+        ]
+
+    def test_nan_messages_behave_exactly_like_null_messages(self):
+        messages = load_messages("coverage_loss_null_alt_jfk_n69f")
+        null_path = run_engine(messages, final_timeout=True)
+        nan_path = run_engine(self.as_pandas_records(messages), final_timeout=True)
+        assert nan_path == null_path
+
+    def test_unknown_altitude_cannot_confirm_coverage_loss(self):
+        # alt < 450 m is the gate; an unknown altitude is not a low altitude.
+        events = run_engine(self.as_pandas_records(
+            load_messages("coverage_loss_null_alt_jfk_n69f")), final_timeout=True)
+        assert only_types(events, "arrival") == []
+
+    def test_details_survive_strict_json(self):
+        # Postgres jsonb rejects the NaN token; what the engine emits must
+        # serialize under the strictness the database enforces.
+        for name, final_timeout in TestSerializationSeam.CASES.items():
+            for events in (
+                run_engine(self.as_pandas_records(load_messages(name)),
+                           final_timeout=final_timeout),
+                run_engine(load_messages(name), final_timeout=final_timeout),
+            ):
+                for event in events:
+                    json.dumps(event["details"], allow_nan=False)
+
+
 class TestFixtureProvenance:
     def test_synthetic_fixtures_are_tracked(self):
         # When a real holding/GA capture lands, add it here and retire the
