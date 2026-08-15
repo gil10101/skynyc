@@ -262,6 +262,31 @@ class TestNaNBoundary:
             load_messages("coverage_loss_null_alt_jfk_n69f")), final_timeout=True)
         assert only_types(events, "arrival") == []
 
+    def test_poisoned_state_blob_decodes_to_null_measurements(self):
+        # State written before the boundary fix already carries NaN samples
+        # (json.dumps emits a bare NaN token and json.loads reads it back), and
+        # decode -> timeout never passes through from_message. The 8/14 outage
+        # survived the first fix through exactly this seam: the checkpoint
+        # replayed a poisoned blob. Decoding must land on the same events the
+        # null-path run produces.
+        messages = load_messages("coverage_loss_null_alt_jfk_n69f")
+        icao24 = messages[0]["icao24"]
+        clean_state = None
+        for message in messages:
+            clean_state, _ = engine.process(clean_state, [message], icao24=icao24)
+        _, expected = engine.process(clean_state, [], icao24=icao24, timed_out=True)
+
+        poisoned = json.loads(engine.encode_state(clean_state))
+        for sample in poisoned["samples"]:
+            for i, v in enumerate(sample):
+                if v is None and not isinstance(sample[i], bool):
+                    sample[i] = float("nan")
+        decoded = engine.decode_state(json.dumps(poisoned))
+        _, events = engine.process(decoded, [], icao24=icao24, timed_out=True)
+        assert events == expected
+        for event in events:
+            json.dumps(event["details"], allow_nan=False)
+
     def test_details_survive_strict_json(self):
         # Postgres jsonb rejects the NaN token; what the engine emits must
         # serialize under the strictness the database enforces.

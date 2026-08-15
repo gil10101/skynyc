@@ -17,7 +17,7 @@ import json
 from typing import Any
 
 from streaming.detectors import arrival, goaround, holding
-from streaming.detectors.common import Sample, from_message, latest_callsign
+from streaming.detectors.common import Sample, _null, from_message, latest_callsign
 
 RING_SIZE = 20
 STATE_TIMEOUT_MS = 90_000  # PRD §7: contact lost = 90 s of silence
@@ -39,8 +39,13 @@ def _sample_to_list(s: Sample) -> list:
 
 
 def _sample_from_list(v: list) -> Sample:
-    return Sample(ts=v[0], lat=v[1], lon=v[2], alt=v[3], vel=v[4], track=v[5],
-                  vrate=v[6], on_ground=v[7], category=v[8], callsign=v[9])
+    # _null on every nullable float: blobs written before the NaN boundary fix
+    # carry literal NaN tokens (json round-trips them), and this path never
+    # crosses from_message — decoding is the second place the null contract
+    # must hold, or a poisoned checkpoint replays the crash forever.
+    return Sample(ts=v[0], lat=_null(v[1]), lon=_null(v[2]), alt=_null(v[3]),
+                  vel=_null(v[4]), track=_null(v[5]), vrate=_null(v[6]),
+                  on_ground=v[7], category=_null(v[8]), callsign=v[9])
 
 
 def encode_state(state: dict | None) -> str:
@@ -59,8 +64,11 @@ def decode_state(raw: str | None) -> dict | None:
         return None
     decoded = json.loads(raw)
     # .get: blobs written before icao24 was serialized must decode, not crash.
+    samples = [_sample_from_list(v) for v in decoded["samples"]]
     return {"icao24": decoded.get("icao24", ""),
-            "samples": [_sample_from_list(v) for v in decoded["samples"]],
+            # A pre-fix blob can hold a NaN position; normalized that is a
+            # null position, which the Sample contract excludes — drop it.
+            "samples": [s for s in samples if s.lat is not None and s.lon is not None],
             "flags": decoded["flags"]}
 
 
