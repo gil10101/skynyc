@@ -31,16 +31,34 @@ function pivot<T extends { airport: string; bucket_ts: string }>(
   return [...byTs.values()].sort((a, b) => String(a.ts).localeCompare(String(b.ts)));
 }
 
+/** At 7d the API's quarter-hour grain is 672 buckets — sub-pixel bars that
+ *  antialias into a wash. Above 48h, sum into hourly buckets so every bar
+ *  keeps visible paint; the card title states the grain it actually shows. */
+function rollupHourly(rows: ArrivalPoint[]): ArrivalPoint[] {
+  const byKey = new Map<string, ArrivalPoint>();
+  for (const r of rows) {
+    const d = new Date(r.bucket_ts);
+    d.setUTCMinutes(0, 0, 0);
+    const bucket_ts = d.toISOString();
+    const prev = byKey.get(`${r.airport}|${bucket_ts}`);
+    if (prev) prev.arrivals += r.arrivals;
+    else byKey.set(`${r.airport}|${bucket_ts}`, { ...r, bucket_ts });
+  }
+  return [...byKey.values()];
+}
+
 export function ArrivalsChart({ filters }: { filters: Filters }) {
   const P = usePaletteOrDark();
   const airport = filters.airports.join(",");
   const q = useData<{ series: ArrivalPoint[] }>(
     "/v1/arrivals", { hours: filters.hours, airport }, "arrivals",
   );
-  const data = pivot(q.data?.series ?? [], (r) => r.arrivals);
+  const hourly = filters.hours > 48;
+  const series = q.data?.series ?? [];
+  const data = pivot(hourly ? rollupHourly(series) : series, (r) => r.arrivals);
   return (
     <ChartCard
-      title="Arrivals per 15 minutes"
+      title={hourly ? "Arrivals per hour" : "Arrivals per 15 minutes"}
       sub="derived from ADS-B by the detection stream — no arrivals feed exists"
       state={q.state}
     >
@@ -128,7 +146,11 @@ export function WindChart({ filters }: { filters: Filters }) {
           {AIRPORT_ORDER.filter((a) => filters.airports.includes(a)).map((a) => (
             <Line
               key={`${a}_gust`} dataKey={`${a}_gust`} stroke={P.airport[a]} strokeDasharray="3 4"
-              dot={false} strokeWidth={1.25} connectNulls strokeOpacity={0.7}
+              // Gusts are reported only while gusting, so the series is sparse;
+              // a bare dashed line disappears at 7d density. Dots mark the
+              // actual observations, the dashes only bridge them.
+              dot={{ r: 2.5, strokeWidth: 0, fill: P.airport[a] }}
+              strokeWidth={1.5} connectNulls strokeOpacity={0.85}
             />
           ))}
         </LineChart>
