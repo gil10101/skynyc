@@ -98,7 +98,7 @@ function Dashboard() {
                 NOAA / National Weather Service
               </a>
               . Historical on-time performance: U.S. BTS TranStats. Basemap ©{" "}
-              OpenStreetMap contributors. Events are <em>derived</em>, and their accuracy
+              OpenStreetMap contributors, © CARTO. Events are <em>derived</em>, and their accuracy
               is published, not claimed.
             </p>
           </div>

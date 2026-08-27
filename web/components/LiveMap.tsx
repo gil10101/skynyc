@@ -25,36 +25,38 @@ const AIRPORTS: Record<string, { lat: number; lon: number; label: string }> = {
   KEWR: { lat: 40.6895, lon: -74.1745, label: "EWR" },
 };
 
+// CARTO's raster basemaps require an API key (free tier, watermarked
+// without one). The key is public by design — it ships in every tile URL
+// the browser requests — so an env override with a checked-in default is
+// the right shape, not a secret.
+const CARTO_KEY =
+  process.env.NEXT_PUBLIC_CARTO_KEY ?? "cb1_29k0_1_6b1cc03c6b847f53b867eda7";
+
 function styleFor(theme: Theme): maplibregl.StyleSpecification {
-  // OSM's standard raster tiles are the keyless option; heavy desaturation
-  // pulls their palette back to the muted base the markers were designed
-  // over. Dark theme additionally clamps brightness rather than inverting —
-  // maplibre raster paint has no invert, and water flipping to white reads
-  // as a rendering bug.
+  const flavor = theme === "light" ? "light_nolabels" : "dark_nolabels";
   const bg = theme === "light" ? "#ffffff" : "#1a1a1a";
-  const paint =
-    theme === "light"
-      ? { "raster-saturation": -0.85, "raster-contrast": -0.08 }
-      : {
-          "raster-saturation": -0.95,
-          "raster-brightness-max": 0.32,
-          "raster-brightness-min": 0.02,
-          "raster-opacity": 0.9,
-        };
   return {
     version: 8,
     sources: {
-      osm: {
+      carto: {
         type: "raster",
-        tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+        tiles: [
+          `https://a.basemaps.cartocdn.com/${flavor}/{z}/{x}/{y}@2x.png?key=${CARTO_KEY}`,
+          `https://b.basemaps.cartocdn.com/${flavor}/{z}/{x}/{y}@2x.png?key=${CARTO_KEY}`,
+        ],
         tileSize: 256,
         attribution:
-          '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+          '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/attributions">CARTO</a>',
       },
     },
     layers: [
       { id: "bg", type: "background", paint: { "background-color": bg } },
-      { id: "osm", type: "raster", source: "osm", paint },
+      {
+        id: "carto",
+        type: "raster",
+        source: "carto",
+        paint: { "raster-opacity": theme === "light" ? 1 : 0.85 },
+      },
     ],
   };
 }
