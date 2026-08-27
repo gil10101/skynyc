@@ -6,6 +6,7 @@
 
 import { ArrowLeft, Pause, Play } from "lucide-react";
 import { useEffect, useState } from "react";
+import { SUNSET_DATE } from "@/lib/api";
 import type { Live } from "@/lib/useLive";
 
 function since(date: Date | null, now: number): string {
@@ -28,11 +29,12 @@ export default function StatusBar({ live, paused, onPause }: {
   }, []);
 
   const freshness = live.snap?.freshness_s ?? null;
-  const degraded = live.mode === "frozen" || (freshness != null && freshness > 900);
-  const delayed = !degraded && freshness != null && freshness > 120;
+  const archived = SUNSET_DATE != null;
+  const degraded = !archived && (live.mode === "frozen" || (freshness != null && freshness > 900));
+  const delayed = !archived && !degraded && freshness != null && freshness > 120;
 
-  const dotClass = degraded ? "bg-bad" : delayed ? "bg-warn" : "bg-good";
-  const label = degraded ? "OFFLINE" : delayed ? "DELAYED" : live.mode === "polling" ? "LIVE·POLL" : "LIVE";
+  const dotClass = archived ? "bg-muted" : degraded ? "bg-bad" : delayed ? "bg-warn" : "bg-good";
+  const label = archived ? "ARCHIVE" : degraded ? "OFFLINE" : delayed ? "DELAYED" : live.mode === "polling" ? "LIVE·POLL" : "LIVE";
 
   return (
     <header className="sticky top-0 z-20 border-b border-border bg-sidebar/90 backdrop-blur">
@@ -59,7 +61,11 @@ export default function StatusBar({ live, paused, onPause }: {
             </span>
             {label}
             <span className="text-faint">·</span>
-            <span className="text-muted">updated {since(live.lastAt, now)}</span>
+            <span className="text-muted">
+              {archived
+                ? `final capture ${live.snap ? new Date(live.snap.generated_at).toISOString().slice(0, 10) : SUNSET_DATE}`
+                : `updated ${since(live.lastAt, now)}`}
+            </span>
           </span>
           <button
             onClick={() => onPause(!paused)}
@@ -88,6 +94,12 @@ export default function StatusBar({ live, paused, onPause }: {
           </a>
         </div>
       </div>
+      {archived && (
+        <div className="border-t border-border bg-secondary/50 px-4 py-1.5 text-center text-[12px] text-ink-2">
+          The live pipeline ran 2026-08-12 through {SUNSET_DATE} and has been
+          decommissioned. Panels show its final capture; the historical record below is complete.
+        </div>
+      )}
       {degraded && (
         <div className="border-t border-bad/40 bg-bad/10 px-4 py-1.5 text-center text-[12px] text-ink-2">
           Pipeline offline since{" "}

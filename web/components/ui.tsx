@@ -5,7 +5,7 @@
  *  carries the source label through to the UI. */
 
 import { useEffect, useRef, useState } from "react";
-import { get } from "@/lib/api";
+import { get, SUNSET_DATE } from "@/lib/api";
 import type { DataPalette } from "@/lib/palette";
 import type { DataSource } from "@/lib/types";
 
@@ -44,9 +44,15 @@ export function ChartCard({ title, sub, right, height = 260, state = "ready", ch
         </div>
         <div className="flex items-center gap-2">
           {state === "blob" && (
-            <span className="rounded-full border border-warn/40 bg-warn/10 px-2 py-0.5 font-mono text-[9.5px] text-warn">
-              last capture
-            </span>
+            SUNSET_DATE ? (
+              <span className="rounded-full border border-border bg-secondary/60 px-2 py-0.5 font-mono text-[9.5px] text-muted">
+                final capture
+              </span>
+            ) : (
+              <span className="rounded-full border border-warn/40 bg-warn/10 px-2 py-0.5 font-mono text-[9.5px] text-warn">
+                last capture
+              </span>
+            )
           )}
           {right}
         </div>
@@ -59,7 +65,9 @@ export function ChartCard({ title, sub, right, height = 260, state = "ready", ch
         )}
         {state === "error" && (
           <div className="flex h-full items-center justify-center px-6 text-center font-mono text-[11px] text-faint">
-            unavailable — the live API is unreachable and no capture covers this view
+            {SUNSET_DATE
+              ? "not in the archived capture — only the default timeframe was preserved"
+              : "unavailable — the live API is unreachable and no capture covers this view"}
           </div>
         )}
         {(state === "ready" || state === "blob") && children}

@@ -3,6 +3,7 @@
 /** Global filter row: timeframe + airport chips. Chips wear their airport's
  *  fixed hue; the filter changes which series render, never their colors. */
 
+import { SUNSET_DATE } from "@/lib/api";
 import { AIRPORT_LABEL, AIRPORT_ORDER, usePaletteOrDark } from "@/lib/palette";
 import type { Filters, Timeframe } from "@/lib/useFilters";
 
@@ -18,7 +19,11 @@ export default function Controls({ filters, frozen }: { filters: Filters; frozen
             key={t}
             onClick={() => filters.setTimeframe(t)}
             disabled={frozen}
-            title={frozen ? "live API offline — showing the canned 24h capture" : undefined}
+            title={frozen
+              ? SUNSET_DATE
+                ? "archived — the capture preserves the 24h view"
+                : "live API offline — showing the canned 24h capture"
+              : undefined}
             className={`px-3 py-1.5 font-mono text-[11.5px] transition-colors ${
               filters.timeframe === t
                 ? "bg-surface-2 font-bold text-ink"

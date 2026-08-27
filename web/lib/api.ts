@@ -8,6 +8,12 @@ export const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
 export const BLOB_BASE = process.env.NEXT_PUBLIC_BLOB_BASE ?? "";
 
+/** Set when the live pipeline was decommissioned. From this point the page is
+ *  an archive: the API host no longer exists, so every request would burn its
+ *  timeout before falling back. Skipping straight to the blob capture keeps
+ *  first paint fast and the status banner honest. Null = live. */
+export const SUNSET_DATE: string | null = "2026-08-26";
+
 async function fetchJson<T>(url: string, timeoutMs: number): Promise<T> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -53,11 +59,13 @@ export async function get<T>(
     .map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`)
     .join("&");
   const url = `${API_BASE}${path}${query ? `?${query}` : ""}`;
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      return { data: await fetchJson<T>(url, 2000 + attempt * 2000), source: "api" };
-    } catch {
-      /* retry once, then blob */
+  if (!SUNSET_DATE) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        return { data: await fetchJson<T>(url, 2000 + attempt * 2000), source: "api" };
+      } catch {
+        /* retry once, then blob */
+      }
     }
   }
   if (blobKey && BLOB_BASE) {

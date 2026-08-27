@@ -40,7 +40,7 @@ function Dashboard() {
       <Reveal><Section
         eyebrow="NOW · ARRIVALS & CONDITIONS"
         title="Traffic and weather on the three fields"
-        note="Positions poll every 30 seconds from ADS-B; weather every 5 minutes from NWS stations on each field. Every panel below derives from those two feeds — nothing is read from a delay product."
+        note="Positions polled every 30 seconds from ADS-B; weather every 5 minutes from NWS stations on each field. Every panel below derives from those two feeds — nothing is read from a delay product. The pipeline ran 2026-08-12 through 2026-08-26; panels show its final capture."
       >
         <div className="mb-4">
           <Controls filters={filters} frozen={frozen} />
@@ -58,7 +58,7 @@ function Dashboard() {
         <Reveal><Section
           eyebrow="PROOF · THE VALIDATION LOOP"
           title="The detector grades itself against independent truth, daily"
-          note="Arrivals, holding patterns and go-arounds exist in no feed — they are derived from raw telemetry by per-aircraft state machines, then matched every morning against OpenSky's separate arrival records (same aircraft, same airport, within ten minutes). Only arrivals have ground truth; holding and go-arounds are shown but not independently scored. Unscored days display as gaps, never as zeros."
+          note="Arrivals, holding patterns and go-arounds exist in no feed — they were derived from raw telemetry by per-aircraft state machines, then matched every morning against OpenSky's separate arrival records (same aircraft, same airport, within ten minutes). Only arrivals have ground truth; holding and go-arounds are shown but not independently scored. Unscored days display as gaps, never as zeros — the final day of operation is unscored because its ground truth publishes the following morning."
         >
           <QualityTiles filters={filters} />
           <div className="mt-4 grid gap-4 lg:grid-cols-2">
@@ -105,7 +105,7 @@ function Dashboard() {
           <div className="flex flex-col gap-1.5 font-mono text-[11px]">
             <a className="text-ink-2 transition-colors hover:text-accent" href="https://github.com/gil10101/skynyc">github.com/gil10101/skynyc</a>
             <a className="text-ink-2 transition-colors hover:text-accent" href="https://gillu.me">gillu.me</a>
-            <span className="text-[11px] text-muted/70">last updated 08-14-2026</span>
+            <span className="text-[11px] text-muted/70">ran 08-12-2026 to 08-26-2026 · archived</span>
           </div>
         </div>
       </footer>

@@ -5,7 +5,7 @@
  *  sync with the actual data — the signature interaction. */
 
 import { useEffect, useRef, useState } from "react";
-import { API_BASE, BLOB_BASE } from "./api";
+import { API_BASE, BLOB_BASE, SUNSET_DATE } from "./api";
 import type { LiveMode, Snapshot } from "./types";
 
 const POLL_MS = 15_000;
@@ -97,7 +97,10 @@ export function useLive(): Live {
       }
     };
 
-    startSse();
+    // After sunset the API host is gone: connecting would only spend the SSE
+    // and polling timeouts before landing on the blob anyway. Go straight there.
+    if (SUNSET_DATE) void freeze();
+    else startSse();
     return () => {
       disposed = true;
       source?.close();
