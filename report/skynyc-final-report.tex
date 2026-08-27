@@ -54,8 +54,8 @@ scored against 28{,}331 independently recorded ones: mean daily precision
 rebuilt 181~million federal on-time records (1987--2026) into a Delta Lake
 medallion, quantifying the thesis at climatological scale: average arrival
 delay on the worst weather days runs eight to fourteen times higher than on
-clear days. Total infrastructure cost: about \$26 cash and a small fraction of a \$200
-cloud credit grant.
+clear days. Total infrastructure cost: about \$26 of compute and \$10--15 of cloud
+storage and batch services.
 \end{abstract}
 
 \section{The question and the approach}
@@ -325,9 +325,9 @@ variance rather than as an independent monotonic effect.
 The live layer ran continuously from 2026-08-12 to 2026-08-26 on one
 droplet. Steady state: about 4.7\,GB RAM across nine containers, three
 streaming queries each completing micro-batches well inside their trigger
-intervals, and an API credit budget (3{,}000 of 4{,}000 daily) never
-exhausted. Two incidents occurred; both were diagnosed from evidence,
-fixed at the root, and healed without data loss.
+intervals, and the upstream API quota never exhausted. Two incidents
+occurred; both were diagnosed from evidence, fixed at the root, and healed
+without data loss.
 
 \subsection{Incident 1: NaN poisoning (Aug 14--15)}
 
@@ -359,7 +359,7 @@ no special handling. Lesson recorded: container-level health checks do not
 see thread-level death; liveness monitoring must watch the heartbeat the
 component itself emits.
 
-\section{Cost}
+\section{Cost and resource footprint}
 
 \begin{table}[H]
 \centering
@@ -368,17 +368,41 @@ component itself emits.
 \toprule
 Item & Cost & Notes \\
 \midrule
-DigitalOcean droplet & \$26 & 4\,GB tier resized to 8\,GB; hourly billing, \\
- & & 2026-08-11 to 2026-08-27, destroyed at close \\
-Azure (ADLS, ADF, Databricks) & ${\sim}$\$10--15 & against a \$200 credit grant, \\
- & & most of it the one-time medallion build \\
-Vercel (frontend + blob) & \$0 & free tier \\
+DigitalOcean droplet & \$26 & 4\,GB tier resized in place to 8\,GB; hourly \\
+ & & billing, 2026-08-11 to 2026-08-27, destroyed at close \\
+Azure (ADLS, ADF, Databricks) & ${\sim}$\$10--15 & most of it the one-time medallion build \\
+Vercel (frontend + blob) & \$0 & free tier; hosts the permanent archive \\
 \midrule
-Total cash & \textbf{${\sim}$\$26} & against a \$150 budget cap \\
+Total & \textbf{${\sim}$\$36--41} & \\
 \bottomrule
 \end{tabular}
-\caption{Project infrastructure cost, complete.}
+\caption{Infrastructure cost, complete.}
 \end{table}
+
+The allocation behind those numbers ran deliberately close to the metal:
+
+\begin{itemize}
+\item \textbf{One 8\,GB / 4-vCPU droplet} carried all nine containers at a
+steady ${\sim}$4.7\,GB RAM --- the Spark driver (4\,GB heap) owning half,
+Kafka and Postgres most of the rest. CPU load averaged well under half the
+box. Resizing from the 4\,GB tier the day the Spark driver deployed cost
+about a minute of downtime; the restart policies brought the stack back
+unaided.
+\item \textbf{Storage at close:} the streaming bronze archive measured
+1.5\,GB across 175{,}801 Parquet objects; the historical layer's raw
+landing zone 9.0\,GB and its Delta medallion 14.3\,GB; the entire serving
+database compressed to a 14\,MB dump. Disk on the droplet --- Kafka's
+7-day retained log included --- peaked at 22\,GB of the 154 available.
+\item \textbf{Batch compute} was single-node by construction: bronze
+ingestion is per-archive (ZIPs are not splittable), so the 181M-row
+medallion build ran on one auto-terminating Databricks node in
+${\sim}$3.5 hours end to end, and worker count remains a single Terraform
+variable where the workload to justify it appears.
+\item \textbf{API quota as a resource:} the position poll spent 1 credit
+per 30\,s call (${\sim}$2{,}880/day of the 4{,}000 allowance) with a
+degrade-cadence guard; the ground-truth pull cost 36/day from a separate
+bucket. Neither was ever exhausted.
+\end{itemize}
 
 \section{Decommissioning}
 
