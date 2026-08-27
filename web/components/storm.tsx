@@ -23,8 +23,11 @@ interface StormWind {
 const WINDOW_FROM = Date.parse(storm.window.from);
 const WINDOW_TO = Date.parse(storm.window.to);
 
-const hhmm = (iso: string) =>
-  new Date(iso).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false });
+// The whole exhibit is narrated in UTC (warning times, stat tiles, the
+// report) — the axis must speak the same clock or the shaded band reads as
+// misplaced.
+const hhmm = (iso: string) => `${iso.slice(11, 16)}Z`;
+const tooltipLabel = (v: unknown) => `${String(v).slice(0, 10)} ${String(v).slice(11, 16)} UTC`;
 
 /** Nearest 15-min bucket at or after the given instant — ReferenceArea on a
  *  categorical axis must name values that exist in the data. */
@@ -98,7 +101,7 @@ export default function StormSection({ filters }: { filters: Filters }) {
               <CartesianGrid vertical={false} />
               <XAxis dataKey="ts" tickFormatter={hhmm} minTickGap={40} />
               <YAxis allowDecimals={false} />
-              <Tooltip {...tooltipStyle(P)} labelFormatter={(v) => new Date(String(v)).toLocaleString()} />
+              <Tooltip {...tooltipStyle(P)} labelFormatter={tooltipLabel} />
               <Legend formatter={(v) => AIRPORT_LABEL[v] ?? v} wrapperStyle={{ fontSize: 11.5 }} />
               <ReferenceArea x1={warnFrom} x2={warnTo} {...band} />
               {airports.map((a) => (
@@ -116,7 +119,7 @@ export default function StormSection({ filters }: { filters: Filters }) {
               <CartesianGrid vertical={false} />
               <XAxis dataKey="ts" tickFormatter={hhmm} minTickGap={40} />
               <YAxis width={44} tickFormatter={(v) => String(Math.round(Number(v)))} />
-              <Tooltip {...tooltipStyle(P)} labelFormatter={(v) => new Date(String(v)).toLocaleString()} />
+              <Tooltip {...tooltipStyle(P)} labelFormatter={tooltipLabel} />
               <Legend
                 formatter={(v: string) =>
                   v.endsWith("_gust") ? `${AIRPORT_LABEL[v.slice(0, 4)]} gust` : AIRPORT_LABEL[v] ?? v}
@@ -129,8 +132,10 @@ export default function StormSection({ filters }: { filters: Filters }) {
               {airports.map((a) => (
                 <Line
                   key={`${a}_gust`} dataKey={`${a}_gust`} stroke={P.airport[a]} strokeDasharray="3 4"
+                  // gusts are reported only while gusting; bridging the quiet
+                  // afternoon into the storm would draw a trend that never happened
                   dot={{ r: 2, strokeWidth: 0, fill: P.airport[a] }}
-                  strokeWidth={1.25} connectNulls strokeOpacity={0.85}
+                  strokeWidth={1.25} strokeOpacity={0.85}
                 />
               ))}
             </LineChart>
