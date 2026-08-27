@@ -11,6 +11,7 @@ import StatusBar from "@/components/StatusBar";
 import ThemeToggle from "@/components/ThemeToggle";
 import Reveal from "@/components/Reveal";
 import { ArrivalsChart, AirborneChart, WindChart, WindScatter } from "@/components/liveCharts";
+import StormSection from "@/components/storm";
 import { EventsTable, QualityChart, QualityTiles } from "@/components/proof";
 import { Causes, Monthly, Seasonality, Staircase, WorstDays } from "@/components/record";
 import { Section } from "@/components/ui";
@@ -52,6 +53,14 @@ function Dashboard() {
           <WindChart filters={filters} />
           <WindScatter filters={filters} />
         </div>
+      </Section></Reveal>
+
+      <Reveal><Section
+        eyebrow="EVENT · THE AUGUST 20 STORM"
+        title="The night the arrival rate collapsed"
+        note="Severe flash-flood warnings covered all three fields from 21:39 to 00:15 UTC — the worst conditions of the run. The arrival rate fell 74% in four hours, and the recovery push after midnight carries the day's concentration of holding patterns and go-arounds. This window is preserved from the archived record."
+      >
+        <StormSection filters={filters} />
       </Section></Reveal>
 
       <div className="border-y border-border bg-surface/40">
