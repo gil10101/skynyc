@@ -255,6 +255,26 @@ detectors kept scoring through it.}
 \label{tab:weather}
 \end{table}
 
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/web-storm.png}
+\caption{The storm as the public dashboard now presents it: the collapse
+and recovery in 15-minute arrival bars, wind and gusts across the three
+stations, and the Flash Flood Warning interval shaded on both charts. The
+window ships with the page as a static slice of the archived record.}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/storm-replay-frame.png}
+\caption{A frame from the storm replay at 22:25\,UTC --- the trough of the
+collapse. Aircraft positions from the archived bronze telemetry (colored
+by altitude), station chips carrying the observation valid at frame time:
+LaGuardia LIFR at 0.8\,km visibility, Newark IFR, the warning banner
+active. The full 48-second replay of the six-hour window accompanies the
+repository at \code{assets/video/storm-replay-2026-08-20.mp4}.}
+\end{figure}
+
 One capture caveat: alerts were stored for the three airport points only,
 so a warning polygon elsewhere in the metro area --- a tornado warning
 included --- would not appear in this record unless it covered a field.
