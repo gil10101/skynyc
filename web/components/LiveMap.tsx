@@ -26,30 +26,35 @@ const AIRPORTS: Record<string, { lat: number; lon: number; label: string }> = {
 };
 
 function styleFor(theme: Theme): maplibregl.StyleSpecification {
-  const flavor = theme === "light" ? "light_nolabels" : "dark_nolabels";
+  // OSM's standard raster tiles are the keyless option; heavy desaturation
+  // pulls their palette back to the muted base the markers were designed
+  // over. Dark theme additionally clamps brightness rather than inverting —
+  // maplibre raster paint has no invert, and water flipping to white reads
+  // as a rendering bug.
   const bg = theme === "light" ? "#ffffff" : "#1a1a1a";
+  const paint =
+    theme === "light"
+      ? { "raster-saturation": -0.85, "raster-contrast": -0.08 }
+      : {
+          "raster-saturation": -0.95,
+          "raster-brightness-max": 0.32,
+          "raster-brightness-min": 0.02,
+          "raster-opacity": 0.9,
+        };
   return {
     version: 8,
     sources: {
-      carto: {
+      osm: {
         type: "raster",
-        tiles: [
-          `https://a.basemaps.cartocdn.com/${flavor}/{z}/{x}/{y}@2x.png`,
-          `https://b.basemaps.cartocdn.com/${flavor}/{z}/{x}/{y}@2x.png`,
-        ],
+        tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
         tileSize: 256,
         attribution:
-          '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/attributions">CARTO</a>',
+          '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
       },
     },
     layers: [
       { id: "bg", type: "background", paint: { "background-color": bg } },
-      {
-        id: "carto",
-        type: "raster",
-        source: "carto",
-        paint: { "raster-opacity": theme === "light" ? 1 : 0.85 },
-      },
+      { id: "osm", type: "raster", source: "osm", paint },
     ],
   };
 }
