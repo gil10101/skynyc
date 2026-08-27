@@ -208,6 +208,59 @@ other airport-day met both targets.}
 R${\geq}$80\% targets, and the final scored day's tiles.}
 \end{figure}
 
+\subsection{Weather during the run}
+
+The run was mostly benign August VFR, which is exactly what makes its two
+severe episodes legible in the event stream.
+
+\textbf{August 20 --- evening convective flooding.} The National Weather
+Service issued Severe-severity Flash Flood Warnings covering all three
+fields from 21:39\,UTC to 00:15\,UTC (with a Special Marine Warning over the
+JFK approaches and a Flood Watch that stayed in effect into the following
+week). The stations recorded the worst conditions of the run: LaGuardia
+dropped to LIFR at 805\,m visibility with a 41.9\,mm/hr rain rate, and
+Newark gusted to 78\,km/h. The operational response is visible hour by
+hour: the arrival rate across the three fields fell from 103/hr at 18:00 to
+27/hr at 22:00 --- a 74\% collapse --- and the recovery push at
+02:00--03:00\,UTC carries the day's concentration of holding patterns and
+go-arounds. Ground truth dipped the same way (1{,}542 recorded arrivals
+against a ${\sim}$1{,}800 typical day: cancellations and diversions, not
+detector loss), and the day scored normally --- precision 96.7--98.8\%.
+
+\textbf{August 23 --- morning flash flooding.} A second episode brought
+Flash Flood Warnings to the fields from 10:12 to 13:15\,UTC, with rain
+rates to 24\,mm/hr and IFR visibility. The operational effect was milder
+(1{,}607 arrivals, a modest dip); the day scored 98.3--99.5\% precision.
+
+\textbf{August 17 --- IFR morning.} The run's third-worst day was not a
+storm but low ceilings: 116 IFR/LIFR observations across the stations, and
+the run's second-highest holding count (24 events).
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{lllrrr}
+\toprule
+Date & Worst alert in effect & Worst obs. & Arrivals & Holding & Go-arounds \\
+\midrule
+08-17 & --- & IFR, 2.8\,km vis & 1{,}817 & 24 & 5 \\
+08-20 & Flash Flood Warning (Severe) & LIFR, 805\,m vis, 78\,km/h gust & 1{,}479 & 9 & 7 \\
+08-23 & Flash Flood Warning (Severe) & IFR, 24\,mm/hr rain & 1{,}607 & 2 & 2 \\
+\bottomrule
+\end{tabular}
+\caption{The run's turbulent-weather days against a ${\sim}$1{,}800-arrival
+typical day. August 20 is the run's clearest demonstration of the thesis:
+severe weather arrived, the arrival rate collapsed within the hour, and the
+detectors kept scoring through it.}
+\label{tab:weather}
+\end{table}
+
+One capture caveat: alerts were stored for the three airport points only,
+so a warning polygon elsewhere in the metro area --- a tornado warning
+included --- would not appear in this record unless it covered a field.
+
+\subsection{Newark's recall}
+
 Newark's recall ran consistently below the other two fields
 (76.3--90.6\%, mean 85.7\%). The pattern is structural, not noise: EWR sits at the
 edge of the receiver coverage the detectors work from, and its
