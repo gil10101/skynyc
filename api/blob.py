@@ -38,7 +38,7 @@ TIMEOUT_S = 10
 
 HISTORY_KEYS = (
     "staircase", "causes", "seasonality", "worst", "monthly",
-    "quality", "arrivals", "airborne", "wind",
+    "quality", "arrivals", "airborne", "wind", "events", "scatter",
 )
 
 # Canned default-timeframe sources — what the page shows when filters are dead.
@@ -52,6 +52,8 @@ _history_sources = {
     "arrivals": lambda: live.arrivals(24),
     "airborne": lambda: live.airborne(24),
     "wind": lambda: live.wind(24),
+    "events": lambda: live.recent_events(None, None, 25),
+    "scatter": lambda: live.scatter(7),
 }
 
 

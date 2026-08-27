@@ -112,7 +112,7 @@ export function QualityChart({ filters }: { filters: Filters }) {
 
 export function EventsTable({ filters }: { filters: Filters }) {
   const P = usePaletteOrDark();
-  const q = useData<{ events: EventRow[] }>("/v1/events", { limit: 25 }, undefined);
+  const q = useData<{ events: EventRow[] }>("/v1/events", { limit: 25 }, "events");
   const rows = (q.data?.events ?? []).filter((e) => filters.airports.includes(e.airport));
   return (
     <ChartCard

@@ -182,7 +182,7 @@ export function WindChart({ filters }: { filters: Filters }) {
 
 export function WindScatter({ filters }: { filters: Filters }) {
   const P = usePaletteOrDark();
-  const q = useData<{ points: ScatterPoint[] }>("/v1/scatter", { days: 7 }, undefined);
+  const q = useData<{ points: ScatterPoint[] }>("/v1/scatter", { days: 7 }, "scatter");
   const points = (q.data?.points ?? []).filter((p) => filters.airports.includes(p.airport));
   // A calm week is all one category — say so, or uniform color reads as a bug.
   const categories = [...new Set(points.map((p) => p.flight_category).filter(Boolean))] as string[];
