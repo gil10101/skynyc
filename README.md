@@ -5,6 +5,11 @@
 Real-time measurement of how weather degrades airport operations in the New York
 terminal area — JFK, LaGuardia, and Newark.
 
+**Status: concluded.** The live pipeline ran 2026-08-12 through 2026-08-26. The
+public dashboard at [sky.gillu.me](https://sky.gillu.me) now serves the final
+capture; the full write-up is in
+[`report/skynyc-final-report.pdf`](report/skynyc-final-report.pdf).
+
 The pipeline ingests live aircraft positions (OpenSky Network ADS-B) and official
 weather observations and alerts (NOAA / National Weather Service), derives
 operational events — **arrivals, holding patterns, go-arounds** — from raw
@@ -181,14 +186,15 @@ Kafka log** with adjusted values and re-scoring against ground truth — the
 scores land in `mart_detection_quality` (grain: day × airport), targets
 P ≥ 85% / R ≥ 80%.
 
-Scores from the first full detection day (matching rule: same transponder,
-same airport, |Δt| ≤ 10 min against OpenSky's independent arrival records):
+Final scores over the fourteen fully scored days of the run (matching rule:
+same transponder, same airport, |Δt| ≤ 10 min against OpenSky's independent
+arrival records) — 26,303 detected arrivals scored against 28,331 recorded:
 
-| Airport | Precision | Recall |
+| Airport | Mean precision | Mean recall |
 |---|---|---|
-| JFK | 98.8% | 98.5% |
-| LaGuardia | 99.1% | 95.0% |
-| Newark | 98.1% | 86.1% |
+| JFK | 96.1% | 97.6% |
+| LaGuardia | 97.8% | 95.8% |
+| Newark | 96.0% | 85.7% |
 
 ![Dagster asset detail for the quality mart: raw SQL, per-input data versions, execution history](assets/img/dagster-mart_detection_quality.png)
 *The quality mart as Dagster sees it: the scoring SQL inline, data versions per
@@ -216,22 +222,22 @@ yet.
 | M2 Live map | Spark bronze→Azure + live positions, provisioned dashboard | Complete |
 | M3 Detection & validation | Detectors + fixture suite, ground-truth pull, quality mart | Complete — full-day scores: precision 97-98%, recall 87-99% |
 | M4 Modeling | Full dbt DAG (hourly facts, weather join-at-read, impact mart), scheduled builds | Built and self-running: hourly build + source freshness on the Dagster daemon, daily quality report after the ground-truth pull |
-| M5 Dashboard & soak | Remaining panels, alert overlays, 72-hour continuous soak | Panels live with alert annotations; soak underway |
-| M6 Analysis & packaging | The written answer, demo capture | — |
+| M5 Dashboard & soak | Remaining panels, alert overlays, 72-hour continuous soak | Complete — 14-day soak, two incidents diagnosed and healed without data loss |
+| M6 Analysis & packaging | The written answer, final report, decommission | Complete — `report/skynyc-final-report.pdf` |
 
 ## The public dashboard
 
-`https://sky.gillu.me` — the pipeline, watchable: live map with dead-reckoned
-aircraft, per-field conditions, derived-event panels, the daily precision/recall
-scores, and the 38-year historical record. Interactive (timeframe + airport
-filters, shareable URLs) and honest by construction: unscored days render as
-gaps, and if the pipeline goes down the page says so and serves its last capture.
+`https://sky.gillu.me` — the pipeline, watchable: the map with the final aircraft
+positions, per-field conditions, derived-event panels, the daily precision/recall
+scores, and the 38-year historical record. Honest by construction: unscored days
+render as gaps, and the page states plainly that it is an archive.
 
-The frontend (`web/`, Next.js) deploys on Vercel; it reads a GET-only FastAPI
-service (`api/`) on the droplet behind Caddy TLS at `api.sky.gillu.me` — the one
-deliberate exception to the loopback rule, backed by a SELECT-only database role.
-The API also pushes `live.json`/`history.json` snapshots to Vercel Blob, which
-the page falls back to automatically — so the dashboard outlives the droplet.
+The frontend (`web/`, Next.js) deploys on Vercel. While the pipeline ran it read
+a GET-only FastAPI service (`api/`) on the droplet behind Caddy TLS at
+`api.sky.gillu.me` — the one deliberate exception to the loopback rule, backed by
+a SELECT-only database role — over SSE with polling fallback. The API also pushed
+`live.json`/`history.json` snapshots to Vercel Blob, which the page now serves
+permanently: the dashboard outlives the droplet by design.
 
 ## Running it
 

@@ -31,3 +31,7 @@ infra/terraform/**/.terraform/
 infra/terraform/**/tfplan
 infra/terraform/tfplan
 .terraform/
+
+
+/portfolio-assets
+.vercel
